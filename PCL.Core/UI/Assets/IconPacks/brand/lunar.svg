@@ -1,0 +1,6 @@
+<!-- PCL_Plus 自绘图标：Lunar Client（新月 + 星点），与 lucide 同为 24×24 描边风格，颜色跟随 currentColor -->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M20.4 14.1A8.4 8.4 0 1 1 9.9 3.6a6.7 6.7 0 0 0 10.5 10.5z" />
+  <circle cx="18.4" cy="5" r="1.1" fill="currentColor" stroke="none" />
+</svg>
