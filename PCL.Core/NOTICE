@@ -1,0 +1,46 @@
+PCL.Core — 第三方组件声明
+=========================
+
+本文件只覆盖 PCL.Core 这个类库直接引用的 NuGet 组件。
+整个启动器（含随包分发的二进制与图标资源）的完整清单见仓库根目录的 NOTICE 与 docs/CREDITS.md。
+
+直接依赖
+--------
+
+- CommunityToolkit.Mvvm (MIT)
+  https://github.com/CommunityToolkit/dotnet
+- Microsoft.Xaml.Behaviors.Wpf (MIT)
+  https://github.com/microsoft/XamlBehaviorsWpf
+- Wacton.Unicolour (MIT)
+  https://github.com/waacton/Unicolour
+- System.Management (MIT)
+  https://github.com/dotnet/runtime
+- System.Security.Cryptography.ProtectedData (MIT)
+  https://github.com/dotnet/runtime
+- PlainToolkit.CngProtectedData (MIT)
+  https://github.com/PlainToolkit/CngProtectedData
+- SharpZipLib (MIT)
+  https://github.com/icsharpcode/SharpZipLib
+- Microsoft.Data.Sqlite / SQLitePCLRaw.bundle_e_sqlite3 (MIT)
+  https://github.com/dotnet/efcore
+  https://github.com/ericsink/SQLitePCL.raw
+- System.Text.Json (MIT)
+  https://github.com/dotnet/runtime
+- YamlDotNet (MIT)
+  https://github.com/aaubry/YamlDotNet
+- fNbt (MIT)
+  https://github.com/fragmer/fNbt
+- LiteDB (MIT)
+  https://github.com/litedb-org/LiteDB
+- Ae.Dns.Client (MIT)
+  https://github.com/alanedwardes/Ae.Dns
+- Microsoft.Extensions.Http / Microsoft.Extensions.Logging (MIT)
+  https://github.com/dotnet/runtime
+- Polly (BSD-3-Clause)
+  https://github.com/App-vNext/Polly
+- Humanizer.Core.zh-CN (MIT)
+  https://github.com/Humanizr/Humanizer
+- System.IdentityModel.Tokens.Jwt (MIT)
+  https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet
+- FluentValidation (Apache-2.0)
+  https://github.com/FluentValidation/FluentValidation
