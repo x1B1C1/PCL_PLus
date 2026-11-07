@@ -1,0 +1,84 @@
+PCL_Plus 许可证
+===============
+
+本项目（PCL_Plus）是 PCL Lite 的衍生作品；PCL Lite 又是 PCL（Plain Craft Launcher）的衍生作品。
+PCL 以 MIT 许可证发布；PCL Lite 与本项目同样以 MIT 发布，并附带下列传染性（copyleft）附加条款。
+
+上游仓库：
+- PCL Lite：<https://github.com/askbbtsk/pcl-lite>
+- PCL（Plain Craft Launcher）：<https://github.com/Meloong-Git/PCL>
+
+
+MIT License
+-----------
+
+Copyright (c) 2026 xL1nUwU (PCL_Plus)
+Copyright (c) 2026 PCL Lite
+Copyright (c) PCL (Plain Craft Launcher) and contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+附加条款（传染性）
+Addendum (Copyleft)
+-------------------
+
+1. 传染性
+   任何修改版、衍生版或再分发版，必须同样以本协议（MIT + 本附加条款）分发，
+   不得改用其他许可证。
+
+2. 必须署名
+   必须完整保留本项目的版权声明与作者署名，不得删除或替换；
+   同时必须保留上游 PCL Lite 与 PCL 的版权声明和作者署名。
+
+3. 二次修改须标注 PCL_Plus
+   修改后分发时，必须在名称或说明中明确标注本项目为 PCL_Plus，
+   并注明其基于 PCL Lite（<https://github.com/askbbtsk/pcl-lite>），
+   不得抹去或替换原有标识。
+
+4. 与 Mojang / Microsoft / Moonsworth 无关
+   本项目与 Mojang Studios、Microsoft 和 Moonsworth 及其关联公司没有任何关系，
+   未获其批准、授权或背书。
+
+5. 地域限制
+   中国大陆用户请勿使用。
+
+6. 协议可变
+   本协议可能随时更新，且不提前通知；更新只对之后获取的版本生效，
+   已经 fork 或已经分发的版本不受影响。
+
+7. 上游仓库位置
+   本仓库在 README、docs/CREDITS.md 与 NOTICE 中保留上游仓库的链接与署名，
+   作为对 PCL Lite 与本项目共同上游 PCL 的位置标注。
+
+
+第三方组件与各自许可证
+----------------------
+
+本项目分发物中包含的第三方组件**不受本文件许可**，各自保留原有许可证。
+完整清单与逐项说明见 [`NOTICE`](NOTICE) 与 [`docs/CREDITS.md`](docs/CREDITS.md)。
+
+- **PCL-Symbio-Edition**（Apache-2.0）——基岩版下载 / 安装 / 启动逻辑移植自此项目，
+  该部分仍受 Apache-2.0 约束，全文见 [`LICENSE-APACHE`](LICENSE-APACHE)。
+- **Terracotta（陶瓦联机）**（AGPL-3.0-or-later，附打包与 IPC 例外）——
+  以未修改二进制形式随启动器分发，全文见 [`LICENSE-AGPL-3.0`](LICENSE-AGPL-3.0)，
+  对应源码见 [`tools/t/`](tools/t/)。
+- **Lucide 图标**（ISC）——见 `PCL.Core/UI/Assets/IconPacks/lucide/LICENSE.txt`。
+- **VCRUNTIME140.DLL**——Microsoft Visual C++ 可再发行组件，随 Terracotta 运行时一并分发。
+- 其余 NuGet 依赖（MIT / Apache-2.0 / BSD）见 [`docs/CREDITS.md`](docs/CREDITS.md)。

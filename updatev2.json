@@ -1,0 +1,15 @@
+{
+  "schema": 2,
+  "sources": [
+    {
+      "repo": "x1B1C1/PCL_PLus",
+      "tier": "official",
+      "weight": 100
+    },
+    {
+      "repo": "x1B1C1/PCL_Plus_OTA",
+      "tier": "backup",
+      "weight": 40
+    }
+  ]
+}
