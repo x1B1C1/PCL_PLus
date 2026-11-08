@@ -1,0 +1,535 @@
+using System;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Threading;
+using PCL.Core.App;
+using PCL.Core.App.Localization;
+using PCL.Core.IO.Net.Consent;
+
+namespace PCL.Pages.PageLaunch;
+
+/// <summary>
+/// PCL_Plus 欢迎页。
+/// <para>
+/// 静态文案按语言分分支存放，加载时由 <see cref="HomepageLanguageApi"/> 按当前 UI 语言过滤——
+/// 与自定义主页（Custom.xaml）走的是同一套语言协议，所以欢迎页本身就是该协议的第一个内置示例。
+/// 卡片标题、按钮与状态行等需要随语言即时刷新的部分沿用 DynamicResource / <see cref="Lang.Text"/>。
+/// </para>
+/// <para>
+/// 只使用内置的 <see cref="MyCard"/> / <see cref="MyButton"/> 等控件，因此视觉与其余页面一致。
+/// </para>
+/// </summary>
+public partial class PageWelcome
+{
+    private TextBlock? _networkStatus;
+    private TextBlock? _privacyStatus;
+
+    public PageWelcome()
+    {
+        InitializeComponent();
+        Loaded += (_, _) => Build();
+        // 切换语言后整体重建，让 lang: 分支重新按新语言过滤。
+        // 注意：必须用静态方法组而不是 static lambda，否则 WeakLanguageChanged 会因
+        // 委托带有 Target 而抛 ArgumentException（详见 WeakLanguageChanged.Add 的注释）。
+        WeakLanguageChanged.Add(this, OnLanguageChanged);
+    }
+
+    private static void OnLanguageChanged(PageWelcome page) => ModBase.RunInUi(page.Build);
+
+    /// <summary>
+    ///     构建（或重建）欢迎页内容并应用当前语言的分支过滤。
+    /// </summary>
+    /// <summary>
+    ///     是否在主页显示彩蛋卡片。
+    ///     <para>
+    ///         2.0 不显示，2.1 起显示；只改这一个常量即可，卡片本身与构建顺序都保持不变。
+    ///     </para>
+    /// </summary>
+    private const bool EnableEasterEgg = false;
+
+    private void Build()
+    {
+        PanRoot.Children.Clear();
+        // 彩蛋卡片放在性能卡片之上：与性能、隐私、社区同款 MyCard，只是没有按钮
+        if (EnableEasterEgg) PanRoot.Children.Add(_BuildEasterEggCard());
+        PanRoot.Children.Add(_BuildLaunchOptionsCard());
+        PanRoot.Children.Add(_BuildRecentCard());
+        PanRoot.Children.Add(_BuildHero());
+        PanRoot.Children.Add(_BuildCommunityCard());
+        // 主页语言 API：同一父容器下只保留命中当前语言的分支
+        HomepageLanguageApi.ApplyToTree(this, LocalizationService.CurrentLanguage.Code);
+    }
+
+    /// <summary>
+    ///     启动选项卡片：与启动日志卡同样式的轻量开关区。
+    /// </summary>
+    private MyCard _BuildLaunchOptionsCard()
+    {
+        var card = new MyCard { Margin = new Thickness(0, 0, 0, 15), CanSwap = false };
+
+        var panel = new StackPanel { Margin = new Thickness(20, 14, 20, 14) };
+
+        var check = new MyCheckBox
+        {
+            Text = Lang.Text("Welcome.Options.CheckDependency"),
+            Margin = new Thickness(0, 0, 0, 0)
+        };
+        check.SetChecked(Config.Launch.ModDependencyCheck, false);
+        check.Change += (_, value) => Config.Launch.ModDependencyCheck = value;
+        panel.Children.Add(check);
+
+        card.Children.Add(panel);
+        return card;
+    }
+
+    #region 卡片
+
+    #region 上次游玩
+    /// <summary>
+    ///     主页最上方的「上次游玩」卡片：显示当前选中的实例，并提供一键继续。
+    ///     <para>
+    ///         没有选中实例时给出空态提示，而不是把整张卡片藏起来，避免主页顶部突然塌陷。
+    ///     </para>
+    /// </summary>
+    private MyCard _BuildRecentCard()
+    {
+        var card = new MyCard
+        {
+            Margin = new Thickness(0, 15, 0, 0),
+            Title = Lang.Text("Welcome.Recent.Title"),
+            CanSwap = false
+        };
+
+        var panel = new StackPanel { Margin = new Thickness(25, 38, 25, 18) };
+
+        var instance = ModInstanceList.mcInstanceList?
+            .SelectMany(pair => pair.Value)
+            .FirstOrDefault(item => string.Equals(item.PathInstance, States.Game.SelectedInstance,
+                StringComparison.OrdinalIgnoreCase));
+
+        if (instance is null)
+        {
+            var empty = new TextBlock
+            {
+                Text = Lang.Text("Welcome.Recent.Empty"),
+                FontSize = 13,
+                TextWrapping = TextWrapping.Wrap,
+                Opacity = 0.75
+            };
+            panel.Children.Add(empty);
+        }
+        else
+        {
+            panel.Children.Add(new TextBlock
+            {
+                Text = instance.Name,
+                FontSize = 16,
+                FontWeight = FontWeights.SemiBold
+            });
+            panel.Children.Add(new TextBlock
+            {
+                Text = instance.Info?.VanillaName ?? "",
+                FontSize = 12,
+                Margin = new Thickness(0, 5, 0, 0),
+                Opacity = 0.7
+            });
+
+            var launch = new MyButton
+            {
+                Text = Lang.Text("Welcome.Recent.Launch"),
+                ColorType = MyButton.ColorState.Highlight,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0, 16, 0, 0)
+            };
+            launch.Click += (_, _) => ModLaunch.McLaunchStart();
+            panel.Children.Add(launch);
+        }
+
+        card.Children.Add(panel);
+        return card;
+    }
+
+    #endregion
+
+    private MyCard _BuildHero()
+    {
+        var card = new MyCard { Margin = new Thickness(0, 15, 0, 0), CanSwap = false };
+
+        var panel = new StackPanel { Margin = new Thickness(25, 30, 25, 22) };
+
+        var titleLine = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var titleMain = _Text("性能状态", 28, bold: true);
+        titleMain.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrush1");
+        titleLine.Children.Add(titleMain);
+        panel.Children.Add(titleLine);
+
+        var subtitle = _Text("本机实时 · 仅本地计算", 12, false);
+        subtitle.Margin = new Thickness(0, 6, 0, 0);
+        subtitle.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
+        panel.Children.Add(subtitle);
+
+        var cpuRow = _BuildMetricRow("CPU 使用率", out var cpuValue, out var cpuFill);
+        cpuRow.Margin = new Thickness(0, 22, 0, 0);
+        panel.Children.Add(cpuRow);
+
+        var ramRow = _BuildMetricRow("内存占用", out var ramValue, out var ramFill);
+        ramRow.Margin = new Thickness(0, 14, 0, 0);
+        panel.Children.Add(ramRow);
+
+        var detail = _Text("", 11, false);
+        detail.Margin = new Thickness(0, 14, 0, 0);
+        detail.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray4");
+        panel.Children.Add(detail);
+
+        card.Children.Add(panel);
+
+        ulong lastIdle = 0, lastKernel = 0, lastUser = 0;
+        var seeded = false;
+
+        void Update()
+        {
+            if (!GetSystemTimes(out var idle, out var kernel, out var user)) return;
+
+            var idleNow = ToUInt64(idle);
+            var kernelNow = ToUInt64(kernel);
+            var userNow = ToUInt64(user);
+
+            if (seeded)
+            {
+                var idleDelta = idleNow - lastIdle;
+                var totalDelta = kernelNow - lastKernel + (userNow - lastUser);
+                var cpu = totalDelta > 0 ? (1d - idleDelta / (double)totalDelta) * 100d : 0d;
+                cpu = Math.Clamp(cpu, 0d, 100d);
+                cpuValue.Text = $"{cpu:0}%";
+                cpuFill.Width = 300d * cpu / 100d;
+            }
+
+            lastIdle = idleNow;
+            lastKernel = kernelNow;
+            lastUser = userNow;
+            seeded = true;
+
+            var mem = new MemoryStatusEx { dwLength = (uint)Marshal.SizeOf<MemoryStatusEx>() };
+            if (GlobalMemoryStatusEx(ref mem))
+            {
+                var ram = mem.dwMemoryLoad;
+                ramValue.Text = $"{ram}%";
+                ramFill.Width = 300d * ram / 100d;
+                detail.Text = $"已用 {FormatGb(mem.ullTotalPhys - mem.ullAvailPhys)} / " +
+                              $"{FormatGb(mem.ullTotalPhys)}  ·  可用 {FormatGb(mem.ullAvailPhys)}";
+            }
+        }
+
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        timer.Tick += (_, _) => Update();
+        card.Loaded += (_, _) =>
+        {
+            Update();
+            timer.Start();
+        };
+        card.Unloaded += (_, _) => timer.Stop();
+
+        return card;
+    }
+
+    private static Grid _BuildMetricRow(string label, out TextBlock value, out System.Windows.Shapes.Rectangle fill)
+    {
+        var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+        var lab = _Text(label, 12, false);
+        lab.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray3");
+        row.Children.Add(lab);
+
+        value = _Text("--", 12, bold: true);
+        value.HorizontalAlignment = HorizontalAlignment.Right;
+        value.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrush1");
+        Grid.SetColumn(value, 1);
+        row.Children.Add(value);
+
+        var track = new Grid
+        {
+            Height = 7,
+            Margin = new Thickness(0, 7, 0, 0),
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        var background = new Border { CornerRadius = new CornerRadius(3.5) };
+        background.SetResourceReference(Border.BackgroundProperty, "ColorBrush7");
+        track.Children.Add(background);
+
+        fill = new System.Windows.Shapes.Rectangle
+        {
+            Width = 0,
+            Height = 7,
+            RadiusX = 3.5,
+            RadiusY = 3.5,
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
+        fill.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "ColorBrush3");
+        track.Children.Add(fill);
+
+        Grid.SetRow(track, 1);
+        Grid.SetColumnSpan(track, 2);
+        row.Children.Add(track);
+        return row;
+    }
+
+    private static string FormatGb(ulong bytes) => $"{bytes / 1024d / 1024d / 1024d:0.0} GB";
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct FileTime
+    {
+        public uint Low;
+        public uint High;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MemoryStatusEx
+    {
+        public uint dwLength;
+        public uint dwMemoryLoad;
+        public ulong ullTotalPhys;
+        public ulong ullAvailPhys;
+        public ulong ullTotalPageFile;
+        public ulong ullAvailPageFile;
+        public ulong ullTotalVirtual;
+        public ulong ullAvailVirtual;
+        public ulong ullAvailExtendedVirtual;
+    }
+
+    private static ulong ToUInt64(FileTime time) => ((ulong)time.High << 32) | time.Low;
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetSystemTimes(out FileTime idleTime, out FileTime kernelTime, out FileTime userTime);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GlobalMemoryStatusEx(ref MemoryStatusEx buffer);
+
+    private MyCard _BuildNetworkCard()
+    {
+        var card = new MyCard
+        {
+            Margin = new Thickness(0, 15, 0, 0),
+            Title = Lang.Text("Welcome.Network.Title"),
+            CanSwap = false
+        };
+
+        var panel = new StackPanel { Margin = new Thickness(25, 38, 25, 18) };
+
+        var description = new StackPanel();
+        _AddLocalizedText(description, 13, false,
+            ("zh-CN", "PCL_Plus 不会在你不知情时联网。每一次出站连接都会先归入某个「用途」，" +
+                      "由你决定是否放行；未登记的目标会被直接拦截，请求不会离开进程。"),
+            ("zh-TW", "PCL_Plus 不會在你不知情時連網。每一次連出連線都會先歸入某個「用途」，" +
+                      "由你決定是否放行；未登記的目標會被直接攔截，請求不會離開行程。"),
+            ("en", "PCL_Plus never goes online behind your back. Every outbound connection is first " +
+                   "classified into a purpose that you choose to allow or block; unregistered targets " +
+                   "are dropped before the request ever leaves the process."));
+        panel.Children.Add(description);
+
+        _networkStatus = _Text("", 13, bold: true);
+        _networkStatus.Margin = new Thickness(0, 12, 0, 0);
+        panel.Children.Add(_networkStatus);
+
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 14, 0, 0)
+        };
+        buttons.Children.Add(_Button(Lang.Text("Welcome.Network.Manage"),
+            () => _Navigate(FormMain.PageType.Setup, FormMain.PageSubType.SetupLauncherMisc)));
+        panel.Children.Add(buttons);
+
+        card.Children.Add(panel);
+        card.Loaded += (_, _) => RefreshStatus();
+        return card;
+    }
+
+    private MyCard _BuildPrivacyCard()
+    {
+        var card = new MyCard
+        {
+            Margin = new Thickness(0, 15, 0, 0),
+            Title = Lang.Text("Welcome.Privacy.Title"),
+            CanSwap = false
+        };
+
+        var panel = new StackPanel { Margin = new Thickness(25, 38, 25, 18) };
+
+        var description = new StackPanel();
+        _AddLocalizedText(description, 13, false,
+            ("zh-CN", "没有任何遥测与崩溃上报，不收集任何使用数据；崩溃分析全程在本地完成。" +
+                      "已安装的版本在断网状态下依然可以启动。"),
+            ("zh-TW", "沒有任何遙測與崩潰回報，不收集任何使用資料；崩潰分析全程在本機完成。" +
+                      "已安裝的版本在斷網狀態下依然可以啟動。"),
+            ("en", "No telemetry, no crash reporting, no usage data collection. Crash analysis " +
+                   "happens entirely on your own machine, and installed versions keep launching " +
+                   "while you are offline."));
+        panel.Children.Add(description);
+
+        _privacyStatus = _Text("", 13, bold: true);
+        _privacyStatus.Margin = new Thickness(0, 12, 0, 0);
+        panel.Children.Add(_privacyStatus);
+
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 14, 0, 0)
+        };
+        buttons.Children.Add(_Button(Lang.Text("Welcome.Privacy.OpenDownload"),
+            () => _Navigate(FormMain.PageType.Download)));
+        panel.Children.Add(buttons);
+
+        card.Children.Add(panel);
+        card.Loaded += (_, _) => RefreshStatus();
+        return card;
+    }
+
+    /// <summary>
+    ///     彩蛋卡片：一句与功能无关的玩笑话。
+    ///     <para>
+    ///         文案本身是恶搞，名字均为虚拟，不代表任何真实人物；只在主页出现，不参与任何逻辑。
+    ///     </para>
+    /// </summary>
+    private MyCard _BuildEasterEggCard()
+    {
+        var card = new MyCard
+        {
+            Margin = new Thickness(0, 15, 0, 0),
+            Title = Lang.Text("Welcome.EasterEgg.Title"),
+            CanSwap = false
+        };
+
+        var panel = new StackPanel { Margin = new Thickness(25, 38, 25, 18) };
+
+        var description = new StackPanel();
+        _AddLocalizedText(description, 13, false,
+            ("zh-CN", "来自山西太原小店区的李亚华阿姨和马晨轩小朋友  你们好啊，我害死了PCL"),
+            ("zh-TW", "來自山西太原小店區的李亞華阿姨和馬晨軒小朋友  你們好啊，我害死了PCL"),
+            ("en", "来自山西太原小店区的李亚华阿姨和马晨轩小朋友  你们好啊，我害死了PCL"));
+        panel.Children.Add(description);
+
+        card.Children.Add(panel);
+        return card;
+    }
+
+    /// <summary>
+    ///     社区卡片：官方 QQ 交流群。
+    ///     <para>
+    ///         群号只在 <see cref="QqGroup"/> 里写一份，贡献者页复用同一处。
+    ///     </para>
+    /// </summary>
+    private MyCard _BuildCommunityCard()
+    {
+        var card = new MyCard
+        {
+            Margin = new Thickness(0, 15, 0, 0),
+            Title = Lang.Text("Welcome.Community.Title"),
+            CanSwap = false
+        };
+
+        var panel = new StackPanel { Margin = new Thickness(25, 38, 25, 18) };
+
+        // 只保留「加群」入口，不再放说明段落
+        var link = new MyTextButton
+        {
+            Text = Lang.Text("Community.Qq.Link"),
+            FontSize = 13,
+            Margin = new Thickness(0, 0, 0, 0),
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
+        link.Click += (_, _) => QqGroup.Open();
+        panel.Children.Add(link);
+
+        card.Children.Add(panel);
+        return card;
+    }
+
+    #endregion
+
+    #region 状态
+    private void RefreshStatus()
+    {
+        var purposes = NetworkPurposeCatalog.All
+            .Where(x => x.Purpose != NetworkPurpose.Unknown)
+            .ToArray();
+        var allowed = purposes.Count(x => NetworkConsentService.IsAllowed(x.Purpose));
+
+        if (_networkStatus is not null)
+        {
+            _networkStatus.Text = NetworkConsentService.AllowAll
+                ? Lang.Text("Welcome.Network.Status.All", purposes.Length)
+                : Lang.Text("Welcome.Network.Status.Partial", allowed, purposes.Length);
+        }
+
+        if (_privacyStatus is not null)
+        {
+            var privacy = Config.System.PrivacyMode
+                ? Lang.Text("Welcome.Privacy.Mode.On")
+                : Lang.Text("Welcome.Privacy.Mode.Off");
+            _privacyStatus.Text = Lang.Text("Welcome.Privacy.Status", privacy);
+        }
+    }
+
+    #endregion
+
+    #region 构造辅助
+
+    /// <summary>
+    ///     添加一组按语言分分支的文本，每个分支一个 <see cref="TextBlock"/>，
+    ///     由 <see cref="HomepageLanguageApi"/> 在加载时保留命中当前语言的那个。
+    /// </summary>
+    private static void _AddLocalizedText(StackPanel panel, double size, bool bold,
+        params (string Code, string Text)[] branches)
+    {
+        foreach (var (code, text) in branches)
+            panel.Children.Add(_Text(text, size, bold, HomepageLanguageApi.LanguageTagPrefix + code));
+    }
+
+    private static TextBlock _Text(string text, double size, bool bold = false, string? tag = null)
+    {
+        var block = new TextBlock
+        {
+            Text = text,
+            FontSize = size,
+            TextWrapping = TextWrapping.Wrap,
+            FontWeight = bold ? FontWeights.Bold : FontWeights.Normal
+        };
+        if (tag is not null) block.Tag = tag;
+        block.SetResourceReference(TextBlock.ForegroundProperty, bold ? "ColorBrush1" : "ColorBrushGray2");
+        return block;
+    }
+
+    private static MyButton _Button(string text, Action onClick)
+    {
+        var button = new MyButton
+        {
+            Text = text,
+            Height = 32,
+            MinWidth = 116,
+            Margin = new Thickness(0, 0, 10, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Padding = new Thickness(14, 0, 14, 0),
+            ColorType = MyButton.ColorState.Highlight
+        };
+        button.Click += (_, _) => onClick();
+        return button;
+    }
+
+    private static void _Navigate(FormMain.PageType page, FormMain.PageSubType subType = FormMain.PageSubType.Default)
+    {
+        if (ModMain.frmMain is null) return;
+        ModMain.frmMain.PageChange(new FormMain.PageStackData { page = page }, subType);
+    }
+
+    #endregion
+}

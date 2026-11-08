@@ -1,0 +1,802 @@
+﻿using System.Net;
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Effects;
+using PCL.Core.App;
+using PCL.Core.App.Configuration;
+using PCL.Core.IO.Net.Http;
+using PCL.Core.UI.Theme;
+using PCL.Core.Utils.Exts;
+using PCL.Modules.Network;
+
+using PCL.Core.App.Localization;
+namespace PCL.Modules.Base;
+
+public class ModSetup
+{
+    public ModSetup()
+    {
+        // === Hide Group ===
+        ConfigService.RegisterObserver(Config.Preference.Hide,
+            new ConfigObserver(ConfigEvent.Changed, _ => PageSetupUI.HiddenRefresh()));
+
+        // === Launch ===
+        Config.Launch.MemoryAllocationModeConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => LaunchRamType((int)e.Value!)));
+        States.Game.SelectedFolderConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => LaunchFolderSelect((string)(e.Value ?? ""))));
+        States.Game.SelectedInstanceConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => LaunchInstanceSelect((string)(e.Value ?? ""))));
+
+        // === Tool ===
+        Config.Download.ThreadLimitConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => ToolDownloadThread((int)e.Value!)));
+        Config.Download.FileConnectionLimitConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => ToolDownloadFileConnection((int)e.Value!)));
+        Config.Download.SpeedLimitConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => ToolDownloadSpeed((int)e.Value!)));
+
+        // === UI - Launcher ===
+        Config.Preference.Theme.WindowOpacityConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => UiLauncherTransparent((int)e.Value!)));
+        Config.Preference.Theme.ThemeSelectedConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => UiLauncherTheme((int)e.Value!)));
+        Config.Preference.Theme.LiquidGlassEnabledConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            _ => GlassHelper.RefreshAll()));
+        // 拖滑块时只刷新已有的覆盖层，不重走视觉树
+        Config.Preference.Theme.LiquidGlassRefractionConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            _ => GlassHelper.RefreshParams()));
+        Config.Preference.Theme.LiquidGlassHighlightConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            _ => GlassHelper.RefreshParams()));
+        Config.Preference.Theme.LiquidGlassDispersionConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            _ => GlassHelper.RefreshParams()));
+        Config.Preference.Theme.AcrylicEnabledConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            _ => AcrylicHelper.Apply(ModMain.frmMain)));
+        Config.Preference.Background.BackgroundColorfulConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => UiBackgroundColorful((bool)e.Value!)));
+        Config.Preference.LockWindowSizeConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => UiLockWindowSize((bool)e.Value!)));
+
+        // UI - Video Background
+        Config.Preference.Background.AutoPauseVideoConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => UiAutoPauseVideo((bool)e.Value!)));
+
+        // UI - Background Image
+        Config.Preference.Background.WallpaperOpacityConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => UiBackgroundOpacity((int)e.Value!)));
+        Config.Preference.Background.WallpaperBlurRadiusConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => UiBackgroundBlur((int)e.Value!)));
+        Config.Preference.Background.WallpaperSuitModeConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => UiBackgroundSuit((int)e.Value!)));
+
+        // UI - Font
+        Config.Preference.FontConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => UiFont((string)(e.Value ?? ""))));
+
+        // UI - Homepage
+        Config.Preference.Homepage.TypeConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e =>
+            {
+                UiCustomType((int)e.Value!);
+                // 改完主页来源立刻反映到主页上，不用等用户手动切回启动页
+                ModMain.frmLaunchRight?.ForceRefresh();
+            }));
+
+        // UI - Blur
+        Config.Preference.Blur.IsEnabledConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => UiBlur((bool)e.Value!)));
+        Config.Preference.Blur.RadiusConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => UiBlurValue((int)e.Value!)));
+        Config.Preference.Blur.SamplingRateConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => UiBlurSamplingRate((int)e.Value!)));
+        Config.Preference.Blur.KernelTypeConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => UiBlurType((int)e.Value!)));
+
+        // UI - Title Bar
+        Config.Preference.WindowTitleTypeConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => UiLogoType((int)e.Value!)));
+        Config.Preference.WindowTitleCustomTextConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => UiLogoText((string)(e.Value ?? ""))));
+        Config.Preference.TopBarLeftAlignConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => UiLogoLeft((bool)e.Value!)));
+
+        // === System ===
+        Config.Debug.EnabledConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => SystemDebugMode((bool)e.Value!)));
+        Config.Debug.AnimationSpeedConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => SystemDebugAnim((int)e.Value!)));
+        Config.Network.HttpProxy.CustomAddressConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => SystemHttpProxy((string)(e.Value ?? ""))));
+        Config.Network.HttpProxy.TypeConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => SystemHttpProxyType((int)e.Value!)));
+        Config.Network.HttpProxy.CustomUsernameConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => SystemHttpProxyCustomUsername((string)(e.Value ?? ""))));
+        Config.Network.HttpProxy.CustomPasswordConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => SystemHttpProxyCustomPassword((string)(e.Value ?? ""))));
+
+        // === Version ===
+        Config.Instance.MemorySolutionConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => VersionRamType((int)e.Value!)));
+        Config.InstanceAuth.LoginRequirementSolutionConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
+            e => VersionServerLogin((int)e.Value!)));
+
+        // === MCP（内置 AI 控制接口，默认关闭） ===
+        ModMcp.Initialize();
+
+        // === Discord Rich Presence（默认关闭） ===
+        ModDiscord.Initialize();
+
+        // ===== [新增代码开始] 陶瓦联机（Terracotta）可插拔附加模块 =====
+        // 只注册配置观察者；未开启时不会创建进程、线程或 HTTP 轮询。
+        // 插件实现全部位于 Modules\Terracotta\，不参与原有启动流程。
+        try
+        {
+            TerracottaHost.Initialize();
+        }
+        catch (Exception ex)
+        {
+            // 附加模块初始化失败绝不能影响启动器本体。
+            ModBase.Log(ex, "[Terracotta] 初始化失败，已跳过附加模块", ModBase.LogLevel.Debug);
+        }
+        // ===== [新增代码结束] =====
+
+        // 补采上次异常退出（崩溃、断电）遗留的个人设置会话，只读本地文件，失败不影响启动
+        ModPersonalOptions.RecoverExitedSessions();
+    }
+
+    /// <summary>
+    ///     主动应用所有当前配置值。
+    /// </summary>
+    public static void ApplyAll()
+    {
+        // [修改] 配色跟随 PCL Living Fork：先定浅色模式，再应用主题，避免首次渲染用错色板
+        if (Config.Preference.Theme.ColorMode != PCL.Core.App.ColorMode.Light)
+            Config.Preference.Theme.ColorMode = PCL.Core.App.ColorMode.Light;
+
+        // Launch
+        LaunchRamType(Config.Launch.MemoryAllocationMode);
+
+        // Tool
+        ToolDownloadThread(Config.Download.ThreadLimit);
+        ToolDownloadFileConnection(Config.Download.FileConnectionLimit);
+        ToolDownloadSpeed(Config.Download.SpeedLimit);
+
+        // UI - Launcher
+        UiLauncherTransparent(Config.Preference.Theme.WindowOpacity);
+        UiLauncherTheme(Config.Preference.Theme.ThemeSelected);
+        UiBackgroundColorful(Config.Preference.Background.BackgroundColorful);
+        UiLockWindowSize(Config.Preference.LockWindowSize);
+
+        // [修改] 玻璃效果整体移除：窗口亚克力与按钮液态玻璃都不再启用。
+        Config.Preference.Theme.AcrylicEnabled = false;
+        Config.Preference.Theme.LiquidGlassEnabled = false;
+        AcrylicHelper.Apply(ModMain.frmMain);
+        GlassHelper.RefreshAll();
+
+        // UI - Video Background
+        UiAutoPauseVideo(Config.Preference.Background.AutoPauseVideo);
+
+        // UI - Background Image
+        UiBackgroundOpacity(Config.Preference.Background.WallpaperOpacity);
+        UiBackgroundBlur(Config.Preference.Background.WallpaperBlurRadius);
+        UiBackgroundSuit(Config.Preference.Background.WallpaperSuitMode);
+
+        // UI - Font
+        UiFont(Config.Preference.Font);
+
+        // UI - Homepage
+        UiCustomType(Config.Preference.Homepage.Type);
+
+        // UI - Blur
+        if (Config.Preference.Blur.IsEnabled)
+        {
+            UiBlurValue(Config.Preference.Blur.Radius);
+            UiBlurSamplingRate(Config.Preference.Blur.SamplingRate);
+            UiBlurType(Config.Preference.Blur.KernelType);
+        }
+        else
+        {
+            UiBlurValue(0);
+        }
+
+        UiBlur(Config.Preference.Blur.IsEnabled);
+
+        // UI - Title Bar
+        UiLogoType((int)Config.Preference.WindowTitleType);
+        UiLogoText(Config.Preference.WindowTitleCustomText);
+        UiLogoLeft(Config.Preference.TopBarLeftAlign);
+
+        // UI - Hide
+        PageSetupUI.HiddenRefresh();
+
+        // System
+        SystemDebugMode(Config.Debug.Enabled);
+        SystemDebugAnim(Config.Debug.AnimationSpeed);
+        SystemHttpProxy(Config.Network.HttpProxy.CustomAddress);
+        SystemHttpProxyType(Config.Network.HttpProxy.Type);
+        SystemHttpProxyCustomUsername(Config.Network.HttpProxy.CustomUsername);
+        SystemHttpProxyCustomPassword(Config.Network.HttpProxy.CustomPassword);
+    }
+
+    #region Launch
+
+    // 切换选择
+    public static void LaunchInstanceSelect(string value)
+    {
+        ModBase.Log("[Setup] 当前选择的 Minecraft 版本：" + value);
+        ModBase.WriteIni(ModFolder.mcFolderSelected + "PCL.ini", "Version", value);
+    }
+
+    public static void LaunchFolderSelect(string value)
+    {
+        ModBase.Log("[Setup] 当前选择的 Minecraft 文件夹：" + value.Replace("$", ModBase.exePath));
+        ModFolder.mcFolderSelected = value.Replace("$", ModBase.exePath);
+    }
+
+    // 游戏内存
+    public static void LaunchRamType(int type)
+    {
+        if (ModMain.frmSetupLaunch is null)
+            return;
+        ModMain.frmSetupLaunch.RamType(type);
+    }
+
+    #endregion
+
+    #region Tool
+
+    public static void ToolDownloadThread(int value)
+    {
+        ModNet.NetTaskConnectionLimit = Math.Clamp(value + 1, 1, ModNet.NetTaskConnectionLimitMax);
+        DownloadResourceManager.OnConnectionLimitChanged();
+    }
+
+    public static void ToolDownloadFileConnection(int value)
+    {
+        ModNet.NetTaskSingleFileConnectionLimit = Math.Clamp(value + 1, 1,
+            ModNet.NetTaskSingleFileConnectionLimitMax);
+    }
+
+    public static void ToolDownloadSpeed(int value)
+    {
+        ModNet.NetTaskSpeedLimitHigh = value switch
+        {
+            <= 14 => (long)Math.Round((value + 1) * 0.1d * 1024d * 1024d),
+            <= 31 => (long)Math.Round((value - 11) * 0.5d * 1024d * 1024d),
+            <= 41 => (value - 21) * 1024 * 1024L,
+            _ => -1
+        };
+    }
+
+    #endregion
+
+    #region UI
+
+    // 启动器
+    public static void UiLauncherTransparent(int value)
+    {
+        ModMain.frmMain.Opacity = value / 1000d + 0.4d;
+    }
+
+    public static void UiLauncherTheme(int value)
+    {
+        // PCL2 里编号 42 是「极客蓝」的另一个编号（和 11 同色），预设表里没单列。
+        // 直接规范成 11，否则纹理和颜色都对不上
+        if (value == 42)
+        {
+            Config.Preference.Theme.ThemeSelected = 11;
+            value = 11;
+        }
+
+        SyncPresetThemeArgs(value);
+        ThemeManager.ThemeRefresh(value);
+        // [新增] 主题切换后刷新亚克力窗口的半透明标题栏/侧栏颜色
+        AcrylicHelper.Apply(ModMain.frmMain);
+        // [新增] 用内置默认壁纸时，亮 / 暗主题对应昼 / 夜两张图，需要跟着换
+        if (Config.Preference.Background.DefaultWallpaper)
+            PCL.Pages.PageSetup.PageSetupUI.BackgroundRefresh(false, true);
+    }
+
+    /// <summary>
+    ///     把主题编号对应的预设配色参数补齐。
+    ///     <para>
+    ///         在设置页点预设时，<c>PageSetupUI.ApplyPreset</c> 会先写
+    ///         <c>UiLauncherHue/Sat/Light/Delta</c> 再写编号，两者不会脱节。
+    ///         但「转移 PCL 设置」只会搬 <c>UiLauncherTheme</c> 这一个键 —— 那是 PCL2 的存法，
+    ///         它一个编号同时决定颜色和纹理；而这里拆成了「编号管纹理」+「参数管颜色」。
+    ///         于是导入后纹理换了、颜色没换，非得回设置页重选一次才好。
+    ///     </para>
+    ///     <para>
+    ///         这里补上：编号指向某个预设、但参数跟它对不上时，按预设重写一遍参数。
+    ///         参数已经一致时什么都不做，所以正常点预设不会被重复覆盖。
+    ///     </para>
+    /// </summary>
+    private static void SyncPresetThemeArgs(int index)
+    {
+        if (PclThemePresets.ByIndex(index) is not { } preset) return;
+
+        var config = Config.Preference.Theme;
+        var args = preset.Args;
+        // 「欧皇彩」每次进都换色相，任何色相都算对，所以保留现值，只补另外三项
+        var hue = preset.IsRandom ? config.WindowHue : args.Hue;
+        var light = args.LightAdjust + 20;
+        var delta = args.TopbarDelta + 90;
+        var triple = args.TopbarHueTriple is { Length: 3 } tripleArgs ? string.Join(",", tripleArgs) : "";
+
+        if (config.CustomThemeEnabled
+            && config.WindowHue == hue
+            && config.WindowSat == args.Saturation
+            && config.WindowLight == light
+            && config.WindowDelta == delta
+            && config.WindowDeltaTriple == triple)
+            return;
+
+        config.CustomThemeEnabled = true;
+        config.WindowHue = hue;
+        config.WindowSat = args.Saturation;
+        config.WindowLight = light;
+        config.WindowDelta = delta;
+        config.WindowDeltaTriple = triple;
+
+        ModBase.Log($"[Theme] 主题编号 {index} 的配色参数与预设「{preset.Name}」不一致，已按预设补齐",
+            ModBase.LogLevel.Developer);
+    }
+
+    public static void UiBackgroundColorful(bool value)
+    {
+        ThemeManager.ThemeRefresh();
+    }
+
+    public static void UiLockWindowSize(bool value)
+    {
+        if (value)
+            ModMain.frmMain.RemoveResizer();
+        else
+            ModMain.frmMain.AddResizer();
+    }
+
+    // 视频背景
+    public static void UiAutoPauseVideo(bool value)
+    {
+        if (!value)
+        {
+            ModVideoBack.ForcePlay = true;
+            ModVideoBack.VideoPlay();
+        }
+        else
+        {
+            ModVideoBack.ForcePlay = false;
+            if (ModVideoBack.IsGaming)
+                ModVideoBack.VideoPause();
+        }
+    }
+
+    // 背景图片
+    public static void UiBackgroundOpacity(int value)
+    {
+        ModMain.frmMain.ImgBack.Opacity = value / 1000d;
+    }
+
+    public static void UiBackgroundBlur(int value)
+    {
+        ModMain.frmMain.ImgBack.Effect = value == 0 ? null : new BlurEffect { Radius = value + 1 };
+        ModMain.frmMain.ImgBack.Margin = new Thickness(-(value + 1) / 1.8d);
+    }
+
+    public static void UiBackgroundSuit(int value)
+    {
+        if (ModMain.frmMain.ImgBack.Background is null)
+            return;
+        var width = ((ImageBrush)ModMain.frmMain.ImgBack.Background).ImageSource.Width;
+        var height = ((ImageBrush)ModMain.frmMain.ImgBack.Background).ImageSource.Height;
+        if (value == 0)
+        {
+            // 智能：当图片较小时平铺，较大时适应
+            if (width < ModMain.frmMain.PanMain.ActualWidth / 2d && height < ModMain.frmMain.PanMain.ActualHeight / 2d)
+                value = 4; // 平铺
+            else
+                value = 2; // 适应
+        }
+
+        ((ImageBrush)ModMain.frmMain.ImgBack.Background).TileMode = TileMode.None;
+        ((ImageBrush)ModMain.frmMain.ImgBack.Background).Viewport = new Rect(0d, 0d, 1d, 1d);
+        ((ImageBrush)ModMain.frmMain.ImgBack.Background).ViewportUnits = BrushMappingMode.RelativeToBoundingBox;
+        switch (value)
+        {
+            case 1: // 居中
+            {
+                ModMain.frmMain.ImgBack.HorizontalAlignment = HorizontalAlignment.Center;
+                ModMain.frmMain.ImgBack.VerticalAlignment = VerticalAlignment.Center;
+                ((ImageBrush)ModMain.frmMain.ImgBack.Background).Stretch = Stretch.None;
+                ModMain.frmMain.ImgBack.Width = ((ImageBrush)ModMain.frmMain.ImgBack.Background).ImageSource.Width;
+                ModMain.frmMain.ImgBack.Height = ((ImageBrush)ModMain.frmMain.ImgBack.Background).ImageSource.Height;
+                break;
+            }
+            case 2: // 适应
+            {
+                ModMain.frmMain.ImgBack.HorizontalAlignment = HorizontalAlignment.Stretch;
+                ModMain.frmMain.ImgBack.VerticalAlignment = VerticalAlignment.Stretch;
+                ((ImageBrush)ModMain.frmMain.ImgBack.Background).Stretch = Stretch.UniformToFill;
+                ModMain.frmMain.ImgBack.Width = double.NaN;
+                ModMain.frmMain.ImgBack.Height = double.NaN;
+                break;
+            }
+            case 3: // 拉伸
+            {
+                ModMain.frmMain.ImgBack.HorizontalAlignment = HorizontalAlignment.Stretch;
+                ModMain.frmMain.ImgBack.VerticalAlignment = VerticalAlignment.Stretch;
+                ((ImageBrush)ModMain.frmMain.ImgBack.Background).Stretch = Stretch.Fill;
+                ModMain.frmMain.ImgBack.Width = double.NaN;
+                ModMain.frmMain.ImgBack.Height = double.NaN;
+                break;
+            }
+            case 4: // 平铺
+            {
+                ModMain.frmMain.ImgBack.HorizontalAlignment = HorizontalAlignment.Stretch;
+                ModMain.frmMain.ImgBack.VerticalAlignment = VerticalAlignment.Stretch;
+                ((ImageBrush)ModMain.frmMain.ImgBack.Background).Stretch = Stretch.None;
+                ((ImageBrush)ModMain.frmMain.ImgBack.Background).TileMode = TileMode.Tile;
+                ((ImageBrush)ModMain.frmMain.ImgBack.Background).Viewport = new Rect(0d, 0d,
+                    ((ImageBrush)ModMain.frmMain.ImgBack.Background).ImageSource.Width,
+                    ((ImageBrush)ModMain.frmMain.ImgBack.Background).ImageSource.Height);
+                ((ImageBrush)ModMain.frmMain.ImgBack.Background).ViewportUnits = BrushMappingMode.Absolute;
+                ModMain.frmMain.ImgBack.Width = double.NaN;
+                ModMain.frmMain.ImgBack.Height = double.NaN;
+                break;
+            }
+            case 5: // 左上
+            {
+                ModMain.frmMain.ImgBack.HorizontalAlignment = HorizontalAlignment.Left;
+                ModMain.frmMain.ImgBack.VerticalAlignment = VerticalAlignment.Top;
+                ((ImageBrush)ModMain.frmMain.ImgBack.Background).Stretch = Stretch.None;
+                ModMain.frmMain.ImgBack.Width = ((ImageBrush)ModMain.frmMain.ImgBack.Background).ImageSource.Width;
+                ModMain.frmMain.ImgBack.Height = ((ImageBrush)ModMain.frmMain.ImgBack.Background).ImageSource.Height;
+                break;
+            }
+            case 6: // 右上
+            {
+                ModMain.frmMain.ImgBack.HorizontalAlignment = HorizontalAlignment.Right;
+                ModMain.frmMain.ImgBack.VerticalAlignment = VerticalAlignment.Top;
+                ((ImageBrush)ModMain.frmMain.ImgBack.Background).Stretch = Stretch.None;
+                ModMain.frmMain.ImgBack.Width = ((ImageBrush)ModMain.frmMain.ImgBack.Background).ImageSource.Width;
+                ModMain.frmMain.ImgBack.Height = ((ImageBrush)ModMain.frmMain.ImgBack.Background).ImageSource.Height;
+                break;
+            }
+            case 7: // 左下
+            {
+                ModMain.frmMain.ImgBack.HorizontalAlignment = HorizontalAlignment.Left;
+                ModMain.frmMain.ImgBack.VerticalAlignment = VerticalAlignment.Bottom;
+                ((ImageBrush)ModMain.frmMain.ImgBack.Background).Stretch = Stretch.None;
+                ModMain.frmMain.ImgBack.Width = ((ImageBrush)ModMain.frmMain.ImgBack.Background).ImageSource.Width;
+                ModMain.frmMain.ImgBack.Height = ((ImageBrush)ModMain.frmMain.ImgBack.Background).ImageSource.Height;
+                break;
+            }
+            case 8: // 右下
+            {
+                ModMain.frmMain.ImgBack.HorizontalAlignment = HorizontalAlignment.Right;
+                ModMain.frmMain.ImgBack.VerticalAlignment = VerticalAlignment.Bottom;
+                ((ImageBrush)ModMain.frmMain.ImgBack.Background).Stretch = Stretch.None;
+                ModMain.frmMain.ImgBack.Width = ((ImageBrush)ModMain.frmMain.ImgBack.Background).ImageSource.Width;
+                ModMain.frmMain.ImgBack.Height = ((ImageBrush)ModMain.frmMain.ImgBack.Background).ImageSource.Height;
+                break;
+            }
+        }
+    }
+
+    // 字体
+    public static void UiFont(string value)
+    {
+        try
+        {
+            ModBase.SetLaunchFont(value);
+        }
+        catch (Exception ex)
+        {
+            ModBase.Log(
+                ex,
+                "字体加载失败",
+                ModBase.LogLevel.Hint,
+                userSummary: Lang.Text("Setup.Error.OperationFailed"));
+        }
+    }
+
+    // 主页
+    public static void UiCustomType(int value)
+    {
+        if (ModMain.frmSetupUI is null)
+            return;
+        switch (value)
+        {
+            case 0: // 无
+            {
+                ModMain.frmSetupUI.PanCustomPreset.Visibility = Visibility.Collapsed;
+                ModMain.frmSetupUI.PanCustomLocal.Visibility = Visibility.Collapsed;
+                ModMain.frmSetupUI.PanCustomNet.Visibility = Visibility.Collapsed;
+                ModMain.frmSetupUI.HintCustom.Visibility = Visibility.Collapsed;
+                ModMain.frmSetupUI.HintCustomWarn.Visibility = Visibility.Collapsed;
+                break;
+            }
+            case 1: // 本地
+            {
+                ModMain.frmSetupUI.PanCustomPreset.Visibility = Visibility.Collapsed;
+                ModMain.frmSetupUI.PanCustomLocal.Visibility = Visibility.Visible;
+                ModMain.frmSetupUI.PanCustomNet.Visibility = Visibility.Collapsed;
+                ModMain.frmSetupUI.HintCustom.Visibility = Visibility.Visible;
+                ModMain.frmSetupUI.HintCustomWarn.Visibility =
+                    States.Hint.UntrustedHomepage ? Visibility.Collapsed : Visibility.Visible;
+                ModMain.frmSetupUI.HintCustom.Text =
+                    Lang.Text("Setup.Ui.Homepage.LocalFile.Hint");
+                CustomEventService.SetEventType(ModMain.frmSetupUI.HintCustom, EventType.None);
+                break;
+            }
+            case 2: // 联网
+            {
+                ModMain.frmSetupUI.PanCustomPreset.Visibility = Visibility.Collapsed;
+                ModMain.frmSetupUI.PanCustomLocal.Visibility = Visibility.Collapsed;
+                ModMain.frmSetupUI.PanCustomNet.Visibility = Visibility.Visible;
+                ModMain.frmSetupUI.HintCustom.Visibility = Visibility.Visible;
+                ModMain.frmSetupUI.HintCustomWarn.Visibility =
+                    States.Hint.UntrustedHomepage ? Visibility.Collapsed : Visibility.Visible;
+                ModMain.frmSetupUI.HintCustom.Text =
+                    Lang.Text("Setup.Ui.Homepage.NetUpdate.Hint");
+                CustomEventService.SetEventType(ModMain.frmSetupUI.HintCustom, EventType.OpenUrl);
+                CustomEventService.SetEventData(ModMain.frmSetupUI.HintCustom, ProjectLinks.Issues);
+                break;
+            }
+            case 3: // 预设
+            {
+                ModMain.frmSetupUI.PanCustomPreset.Visibility = Visibility.Visible;
+                ModMain.frmSetupUI.PanCustomLocal.Visibility = Visibility.Collapsed;
+                ModMain.frmSetupUI.PanCustomNet.Visibility = Visibility.Collapsed;
+                ModMain.frmSetupUI.HintCustom.Visibility = Visibility.Collapsed;
+                ModMain.frmSetupUI.HintCustomWarn.Visibility = Visibility.Collapsed;
+                break;
+            }
+        }
+
+        ModMain.frmSetupUI.CardCustom.TriggerForceResize();
+    }
+
+    // 高级材质
+    public static void UiBlur(bool value)
+    {
+        if (ModMain.frmSetupUI is null)
+            return;
+
+        ModMain.frmSetupUI.PanBlurValue.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
+        UiBlurValue(value ? Config.Preference.Blur.Radius : 0);
+    }
+
+    public static void UiBlurValue(int value)
+    {
+        System.Windows.Application.Current.Resources["BlurRadius"] = value * 1.0d;
+    }
+
+    public static void UiBlurSamplingRate(int value)
+    {
+        System.Windows.Application.Current.Resources["BlurSamplingRate"] = value * 0.01d;
+    }
+
+    public static void UiBlurType(int value)
+    {
+        System.Windows.Application.Current.Resources["BlurType"] = (KernelType)value;
+    }
+
+    // 顶部栏
+    public static void UiLogoType(int value)
+    {
+        if (ThemeService.CurrentTheme == ColorTheme.HmclBlue) value = 4;
+        switch (value)
+        {
+            case 0: // 无
+            {
+                ModMain.frmMain.ShapeTitleLogo.Visibility = Visibility.Collapsed;
+                ModMain.frmMain.BtnTitleHelp.Visibility = Visibility.Collapsed;
+                ModMain.frmMain.ShapeHMCLTitleLogo.Visibility = Visibility.Collapsed;
+                ModMain.frmMain.LabTitleLogo.Visibility = Visibility.Collapsed;
+                ModMain.frmMain.ImageTitleLogo.Visibility = Visibility.Collapsed;
+                ModMain.frmMain.CELogo.Visibility = Visibility.Collapsed;
+                if (ModMain.frmSetupUI is not null)
+                {
+                    ModMain.frmSetupUI.CheckLogoLeft.Visibility = Visibility.Visible;
+                    ModMain.frmSetupUI.PanLogoText.Visibility = Visibility.Collapsed;
+                    ModMain.frmSetupUI.PanLogoChange.Visibility = Visibility.Collapsed;
+                }
+
+                break;
+            }
+            case 1: // 默认
+            {
+                ModMain.frmMain.ShapeTitleLogo.Visibility = Visibility.Collapsed;
+                ModMain.frmMain.BtnTitleHelp.Visibility = Visibility.Collapsed;
+                ModMain.frmMain.ShapeHMCLTitleLogo.Visibility = Visibility.Collapsed;
+                ModMain.frmMain.LabTitleLogo.Visibility = Visibility.Visible;
+                ModMain.frmMain.LabTitleLogo.Text = "PCL";
+                ModMain.frmMain.ImageTitleLogo.Visibility = Visibility.Collapsed;
+                // 默认字标：PCL_Plus
+                ModMain.frmMain.CELogo.Visibility = Visibility.Collapsed;
+                if (ModMain.frmSetupUI is not null)
+                {
+                    ModMain.frmSetupUI.CheckLogoLeft.Visibility = Visibility.Collapsed;
+                    ModMain.frmSetupUI.PanLogoText.Visibility = Visibility.Collapsed;
+                    ModMain.frmSetupUI.PanLogoChange.Visibility = Visibility.Collapsed;
+                }
+
+                break;
+            }
+            case 2: // 文本
+            {
+                ModMain.frmMain.ShapeTitleLogo.Visibility = Visibility.Collapsed;
+                ModMain.frmMain.BtnTitleHelp.Visibility = Visibility.Collapsed;
+                ModMain.frmMain.ShapeHMCLTitleLogo.Visibility = Visibility.Collapsed;
+                ModMain.frmMain.LabTitleLogo.Visibility = Visibility.Visible;
+                ModMain.frmMain.ImageTitleLogo.Visibility = Visibility.Collapsed;
+                // 自定义标题后面不强加 Lite 徽标
+                ModMain.frmMain.CELogo.Visibility = Visibility.Collapsed;
+                if (ModMain.frmSetupUI is not null)
+                {
+                    ModMain.frmSetupUI.CheckLogoLeft.Visibility = Visibility.Collapsed;
+                    ModMain.frmSetupUI.PanLogoText.Visibility = Visibility.Visible;
+                    ModMain.frmSetupUI.PanLogoChange.Visibility = Visibility.Collapsed;
+                }
+
+                _ = Config.Preference.WindowTitleCustomText;
+                break;
+            }
+            case 3: // 图片
+            {
+                ModMain.frmMain.ShapeTitleLogo.Visibility = Visibility.Collapsed;
+                ModMain.frmMain.BtnTitleHelp.Visibility = Visibility.Collapsed;
+                ModMain.frmMain.ShapeHMCLTitleLogo.Visibility = Visibility.Collapsed;
+                ModMain.frmMain.LabTitleLogo.Visibility = Visibility.Collapsed;
+                ModMain.frmMain.ImageTitleLogo.Visibility = Visibility.Visible;
+                // 自定义标题后面不强加 Lite 徽标
+                ModMain.frmMain.CELogo.Visibility = Visibility.Collapsed;
+                if (ModMain.frmSetupUI is not null)
+                {
+                    ModMain.frmSetupUI.CheckLogoLeft.Visibility = Visibility.Collapsed;
+                    ModMain.frmSetupUI.PanLogoText.Visibility = Visibility.Collapsed;
+                    ModMain.frmSetupUI.PanLogoChange.Visibility = Visibility.Visible;
+                }
+
+                try
+                {
+                    ModMain.frmMain.ImageTitleLogo.Source = ModBase.exePath + @"PCL\Logo.png";
+                }
+                catch (Exception ex)
+                {
+                    ModMain.frmMain.ImageTitleLogo.Source = null;
+                    ModBase.Log(
+                        ex,
+                        "显示标题栏图片失败",
+                        ModBase.LogLevel.Msgbox,
+                        userSummary: Lang.Text("Setup.Error.OperationFailed"));
+                }
+
+                break;
+            }
+            case 4: //HMCL (愚人节)
+                ModMain.frmMain.ShapeTitleLogo.Visibility = Visibility.Collapsed;
+                ModMain.frmMain.ShapeHMCLTitleLogo.Visibility = Visibility.Visible;
+                ModMain.frmMain.LabTitleLogo.Visibility = Visibility.Collapsed;
+                ModMain.frmMain.ImageTitleLogo.Visibility = Visibility.Collapsed;
+                ModMain.frmMain.CELogo.Visibility = Visibility.Collapsed;
+                ModMain.frmMain.BtnTitleHelp.Visibility = Visibility.Visible;
+                if (ModMain.frmSetupUI is not null) 
+                {
+                    ModMain.frmSetupUI.CheckLogoLeft.Visibility = Visibility.Collapsed;
+                    ModMain.frmSetupUI.PanLogoText.Visibility = Visibility.Collapsed;
+                    ModMain.frmSetupUI.PanLogoChange.Visibility = Visibility.Collapsed;
+                }
+
+                break;
+        }
+
+        UiLogoLeft(Config.Preference.TopBarLeftAlign);
+        if (ModMain.frmSetupUI is not null)
+            ModMain.frmSetupUI.CardLogo.TriggerForceResize();
+    }
+
+    public static void UiLogoText(string value)
+    {
+        // [修改] 启动时会用空的自定义标题覆盖默认字标；默认模式下保留 PCL_Plus。
+        if (string.IsNullOrWhiteSpace(value) &&
+            Config.Preference.WindowTitleType == LauncherTitleType.Default)
+            value = "PCL_Plus";
+        ModMain.frmMain.LabTitleLogo.Text = value;
+    }
+
+    public static void UiLogoLeft(bool value)
+    {
+        ModMain.frmMain.PanTitleMain.ColumnDefinitions[0].Width = new GridLength(
+            value && Config.Preference.WindowTitleType == LauncherTitleType.None ? 0 : 1,
+            GridUnitType.Star);
+    }
+
+    #endregion
+
+    #region System
+
+    // 调试选项
+    public static void SystemDebugMode(bool value)
+    {
+        ModBase.modeDebug = value;
+    }
+
+    public static void SystemDebugAnim(int value)
+    {
+        ModAnimation.aniSpeed = value >= 30
+            ? 200d
+            : ModBase.MathClamp(value * 0.1d + 0.1d, 0.1d, 3d);
+    }
+
+    public static void SystemHttpProxy(string value)
+    {
+        if (value.IsNullOrWhiteSpace()) return;
+        try
+        {
+            HttpProxyManager.Instance.CustomProxyAddress = new Uri(value);
+        }
+        catch (Exception ex)
+        {
+            ModBase.Log(ex, "HTTP 代理应用出错");
+        }
+    }
+
+    public static void SystemHttpProxyType(int value)
+    {
+        var mode = (HttpProxyManager.ProxyMode)value;
+        HttpProxyManager.Instance.Mode = Enum.IsDefined(mode)
+            ? mode
+            : HttpProxyManager.Instance.Mode;
+    }
+
+    public static void SystemHttpProxyCustomUsername(string value)
+    {
+        if (!string.IsNullOrEmpty(value))
+        {
+            var password = Config.Network.HttpProxy.CustomPassword;
+            HttpProxyManager.Instance.Credentials = new NetworkCredential(value, password);
+        }
+        else
+        {
+            HttpProxyManager.Instance.Credentials = null;
+        }
+    }
+
+    public static void SystemHttpProxyCustomPassword(string value)
+    {
+        var username = Config.Network.HttpProxy.CustomUsername;
+        HttpProxyManager.Instance.Credentials = !string.IsNullOrEmpty(username)
+            ? new NetworkCredential(username, value)
+            : null;
+    }
+
+    #endregion
+
+    #region Version
+
+    // 游戏内存
+    public static void VersionRamType(int type)
+    {
+        if (ModMain.frmInstanceSetup is null)
+            return;
+        ModMain.frmInstanceSetup.RamType(type);
+    }
+
+    // 服务器
+    public static void VersionServerLogin(int type)
+    {
+        if (ModMain.frmInstanceSetup is null)
+            return;
+        // 为第三方登录清空缓存以更新描述
+        ModBase.WriteIni(ModFolder.mcFolderSelected + "PCL.ini", "InstanceCache", "");
+        if (PageInstanceLeft.McInstance is null)
+            return;
+        PageInstanceLeft.McInstance = new McInstance(PageInstanceLeft.McInstance.Name).Load();
+        ModLoader.LoaderFolderRun(ModInstanceList.mcInstanceListLoader, ModFolder.mcFolderSelected,
+            ModLoader.LoaderFolderRunType.ForceRun, 1, @"versions\");
+    }
+
+    #endregion
+}
