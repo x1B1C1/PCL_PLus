@@ -1,0 +1,45 @@
+<local:MyPageRight
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:PCL.Controls" xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d" x:Class="PCL.Pages.PageInstance.PageInstancePackUpdate"
+    PanScroll="{Binding ElementName=PanBack}" Grid.IsSharedSizeScope="True">
+    <local:MyScrollViewer x:Name="PanBack" VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="25,10,25,10" x:Name="PanContent">
+
+            <local:MyCard Margin="0,15,0,15" Title="{DynamicResource Instance.PackUpdate.Title}">
+                <StackPanel Margin="25,42,20,20">
+                    <TextBlock TextWrapping="Wrap" FontSize="12.5"
+                               Foreground="{DynamicResource ColorBrushGray4}"
+                               Text="{DynamicResource Instance.PackUpdate.Description}" />
+                    <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                        <local:MyButton MinWidth="160" Padding="13,0" ColorType="Highlight"
+                                        Text="{DynamicResource Instance.PackUpdate.Pick}"
+                                        Click="BtnPick_Click" />
+                        <TextBlock x:Name="LabPicked" Margin="14,0,0,0" VerticalAlignment="Center"
+                                   FontSize="12" Foreground="{DynamicResource ColorBrushGray4}"
+                                   TextWrapping="Wrap" MaxWidth="360" />
+                    </StackPanel>
+                </StackPanel>
+            </local:MyCard>
+
+            <local:MyCard Margin="0,0,0,15" x:Name="CardPreview"
+                          Title="{DynamicResource Instance.PackUpdate.PreviewTitle}" MinHeight="55">
+                <StackPanel Margin="20,42,15,15">
+                    <TextBlock x:Name="LabPreviewHint" TextWrapping="Wrap" FontSize="12"
+                               Foreground="{DynamicResource ColorBrushGray4}"
+                               Text="{DynamicResource Instance.PackUpdate.PreviewEmpty}" />
+                    <TextBlock x:Name="LabSummary" Margin="0,6,0,0" TextWrapping="Wrap" FontSize="12.5" />
+                    <StackPanel x:Name="PanEntries" Margin="0,10,0,0" />
+                    <local:MyButton x:Name="BtnApply" Margin="0,16,0,0" MinWidth="160" Padding="13,0"
+                                    ColorType="Highlight" HorizontalAlignment="Left"
+                                    Text="{DynamicResource Instance.PackUpdate.Apply}"
+                                    Click="BtnApply_Click" />
+                </StackPanel>
+            </local:MyCard>
+
+        </StackPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>

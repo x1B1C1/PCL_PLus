@@ -1,0 +1,187 @@
+﻿<local:MyPageRight
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:PCL.Controls" xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d" x:Class="PCL.Pages.PageSetup.PageSetupUpdate"
+    PanScroll="{Binding ElementName=PanBack}">
+    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+        <StackPanel x:Name="PanMain" Margin="25,25,25,10">
+            <local:MyCard Height="Auto">
+                <StackPanel Margin="20,15,20,15">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Name" />
+                            <ColumnDefinition />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="75" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="28" />
+                            <RowDefinition Height="7" />
+                            <RowDefinition Height="28" />
+                            <RowDefinition Height="7" />
+                            <RowDefinition Height="28" />
+                            <RowDefinition Height="7" />
+                            <RowDefinition Height="28" />
+                        </Grid.RowDefinitions>
+
+                        <!--  更新通道  -->
+                        <TextBlock Text="{DynamicResource Setup.Update.Channel.Title}" Grid.Row="0" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                   Margin="0,0,25,0" />
+                        <local:MyComboBox x:Name="ComboSystemUpdateChannel" Tag="SystemUpdateChannel" Grid.Column="1"
+                                          Grid.ColumnSpan="3" Grid.Row="0"
+                                          SelectionChanged="ComboSystemUpdateBranch_SelectionChanged">
+                            <!--  两档：稳定版 / 测试版（测试版包含正式版，不会漏掉稳定更新）  -->
+                            <local:MyComboBoxItem Content="{DynamicResource Setup.Update.Channel.Stable}"
+                                                  ToolTip="{DynamicResource Setup.Update.Channel.Stable.ToolTip}" />
+                            <local:MyComboBoxItem Content="{DynamicResource Setup.Update.Channel.Preview}"
+                                                  ToolTip="{DynamicResource Setup.Update.Channel.Preview.ToolTip}" />
+                        </local:MyComboBox>
+
+                        <!--  自动更新总开关：默认关闭，不勾就完全不联网  -->
+                        <TextBlock Text="{DynamicResource Setup.Update.Auto.Title}" Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                   Margin="0,0,25,0" />
+                        <local:MyCheckBox x:Name="CheckAutoUpdate" Grid.Column="1" Grid.ColumnSpan="3" Grid.Row="2"
+                                          Text="{DynamicResource Setup.Update.Auto.Enable}"
+                                          ToolTip="{DynamicResource Setup.Update.Auto.Enable.ToolTip}"
+                                          Change="CheckAutoUpdate_Change" />
+
+                        <!--  测试 OTA：把更新检查指向测试线，验证整条升级链路  -->
+                        <TextBlock Text="{DynamicResource Setup.Update.TestOta.Title}" Grid.Row="6" VerticalAlignment="Center"
+                                   HorizontalAlignment="Left" Margin="0,0,25,0" />
+                        <local:MyCheckBox x:Name="CheckTestOta" Grid.Column="1" Grid.ColumnSpan="3" Grid.Row="6"
+                                          Text="{DynamicResource Setup.Update.TestOta.Enable}"
+                                          ToolTip="{DynamicResource Setup.Update.TestOta.Enable.ToolTip}"
+                                          Change="CheckTestOta_Change" />
+
+                        <!--  更新方式：只有勾了自动更新才有意义  -->
+                        <TextBlock x:Name="TextUpdateModeTitle" Text="{DynamicResource Setup.Update.Auto.Mode.Title}" Grid.Row="4" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                   Margin="0,0,25,0" />
+                        <local:MyComboBox x:Name="ComboSystemUpdateMode" Tag="SystemUpdateMode" Grid.Column="1"
+                                          Grid.ColumnSpan="3" Grid.Row="4"
+                                          SelectionChanged="ComboSystemUpdateMode_SelectionChanged">
+                            <!--  静默更新已移除：更新必须让用户看见，这里只保留「下载并提示 / 仅提示」  -->
+                            <local:MyComboBoxItem Content="{DynamicResource Setup.Update.Auto.DownloadAndInstall}" ToolTip="{DynamicResource Setup.Update.Auto.DownloadAndInstall.ToolTip}" Visibility="Collapsed" />
+                            <local:MyComboBoxItem Content="{DynamicResource Setup.Update.Auto.DownloadAndNotify}" ToolTip="{DynamicResource Setup.Update.Auto.DownloadAndNotify.ToolTip}" />
+                            <local:MyComboBoxItem Content="{DynamicResource Setup.Update.Auto.NotifyOnly}" ToolTip="{DynamicResource Setup.Update.Auto.NotifyOnly.ToolTip}" />
+                            <local:MyComboBoxItem Content="{DynamicResource Setup.Update.Auto.Disabled}" ToolTip="{DynamicResource Setup.Update.Auto.Disabled.ToolTip}" Visibility="Collapsed" />
+                        </local:MyComboBox>
+                    </Grid>
+                </StackPanel>
+            </local:MyCard>
+            <local:MyCard x:Name="CardUpdate" Margin="0,15">
+                <StackPanel Margin="20,20,20,20">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="50" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="29" />
+                            <RowDefinition Height="1" />
+                            <RowDefinition Height="20" />
+                            <RowDefinition Height="8" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="10" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <!-- <Image Source="/Images/Icons/Tahoe.png" Grid.Column="0" Grid.Row="0" Grid.RowSpan="3" Height="50" Width="50" HorizontalAlignment="Left" VerticalAlignment="Center" /> -->
+                        <!-- 用本地的 PCL_Plus 图标，不要拉上游 CDN 的 CE 图标：那边换了图我们就会显示成别人的 logo -->
+                        <Image x:Name="ImgUpdateIcon" Source="pack://application:,,,/Images/icon.png"
+                               Grid.Column="0" Grid.Row="0" Grid.RowSpan="3" Height="50" Width="50"
+                               HorizontalAlignment="Left" VerticalAlignment="Center" />
+                        <TextBlock x:Name="TextUpdateName" Text="PCL_Plus 2.14.0" FontWeight="Bold" FontSize="20"
+                                   Grid.Row="0" Grid.Column="2" HorizontalAlignment="Left" VerticalAlignment="Bottom" />
+                        <TextBlock x:Name="TextUpdateDesc" Text="by bsk10ww" FontSize="14" Grid.Row="2"
+                                   Grid.Column="2" HorizontalAlignment="Left" VerticalAlignment="Top" />
+                        <!--  按钮宽度跟着文案走：写死 85 时英文的 "Download and install" 会被裁成 "wnload and ins"  -->
+                        <local:MyButton x:Name="BtnUpdate" Text="{DynamicResource Setup.Update.Install}" ColorType="Highlight" Grid.Row="0"
+                                        Grid.RowSpan="2" Grid.Column="3" HorizontalAlignment="Right"
+                                        VerticalAlignment="Center" MinWidth="85" MaxWidth="230" Height="30"
+                                        Click="BtnUpdate_Click" />
+                        <TextBlock x:Name="TextChangelog"
+                                    Text="{DynamicResource Setup.Update.Changelog.Placeholder}"
+                                   Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="4" TextWrapping="Wrap" />
+                        <local:MyTextButton x:Name="BtnChangelogDetail" Text="{DynamicResource Setup.Update.Changelog.MoreInfo}" FontWeight="Thin"
+                                            Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="4" HorizontalAlignment="Left"
+                                            VerticalAlignment="Center" Click="BtnChangelogDetail_Click" />
+                    </Grid>
+                </StackPanel>
+            </local:MyCard>
+            <local:MyCard x:Name="CardCheck" Margin="0,15" Visibility="Collapsed">
+                <StackPanel Margin="20,20,20,20">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="50" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="29" />
+                            <RowDefinition Height="1" />
+                            <RowDefinition Height="20" />
+                        </Grid.RowDefinitions>
+                        <Image Source="pack://application:,,,/Images/icon.png" Grid.Column="0" Grid.Row="0"
+                               Grid.RowSpan="3" Height="50" Width="50" HorizontalAlignment="Left"
+                               VerticalAlignment="Center" />
+                        <!-- <local:MyImage x:Name="ImgUpdateIcon" FallbackSource="pack://application:,,,/images/icon.ico" Source="https://www.pclc.cc/img/pcl-ce/icon.webp" Grid.Column="0" Grid.Row="0" Grid.RowSpan="3" Height="50" Width="50" HorizontalAlignment="Left" VerticalAlignment="Center"/> -->
+                        <TextBlock x:Name="TextCurrentVersion" Text="PCL_Plus 2.13.4" FontWeight="Bold" FontSize="20"
+                                   Grid.Row="0" Grid.Column="2" HorizontalAlignment="Left" VerticalAlignment="Bottom" />
+                        <TextBlock x:Name="TextCurrentDesc" Text="{DynamicResource Setup.Update.Latest}" FontSize="14" Grid.Row="2" Grid.Column="2"
+                                   HorizontalAlignment="Left" VerticalAlignment="Top" />
+                        <local:MyButton x:Name="BtnCheckAgain" Text="{DynamicResource Setup.Update.CheckAgain}" ColorType="Highlight" Grid.Row="0"
+                                        Grid.RowSpan="2" Grid.Column="3" HorizontalAlignment="Stretch" MinWidth="80"
+                                        VerticalAlignment="Stretch" Click="BtnCheckAgain_OnClick" />
+                        <local:MyButton x:Name="BtnChangelog" Text="{DynamicResource Setup.Update.Changelog.View}" ColorType="Normal" Grid.Row="0"
+                                        Grid.RowSpan="2" Grid.Column="5" HorizontalAlignment="Stretch" MinWidth="100"
+                                        VerticalAlignment="Stretch" Click="BtnChangelog_Click" />
+                    </Grid>
+                </StackPanel>
+            </local:MyCard>
+            <local:MyCard x:Name="CardOtherOption" Title="{DynamicResource Setup.Update.OtherOptions.Title}" CanSwap="True" IsSwapped="True"
+                          Visibility="Collapsed">
+                <StackPanel Margin="20,40,20,20">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="50" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="29" />
+                            <RowDefinition Height="1" />
+                            <RowDefinition Height="20" />
+                            <RowDefinition Height="8" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="10" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Image Source="/Images/Icons/Tahoe.png" Grid.Column="0" Grid.Row="0" Grid.RowSpan="3"
+                               Height="50" Width="50" HorizontalAlignment="Left" VerticalAlignment="Center" />
+                        <!--<local:MyImage x:Name="ImgUpdateIcon" FallbackSource="pack://application:,,,/images/icon.ico" Source="https://www.pclc.cc/img/pcl-ce/icon.webp" Grid.Column="0" Grid.Row="0" Grid.RowSpan="3" Height="50" Width="50" HorizontalAlignment="Left" VerticalAlignment="Center"/>-->
+                        <TextBlock x:Name="TextOptionalUpdateName" Text="AquaCL 3.0.0" FontWeight="Bold" FontSize="20"
+                                   Grid.Row="0" Grid.Column="2" HorizontalAlignment="Left" VerticalAlignment="Bottom" />
+                        <TextBlock x:Name="TextOptionalUpdateDesc" Text="20.0 MiB" FontSize="14" Grid.Row="2"
+                                   Grid.Column="2" HorizontalAlignment="Left" VerticalAlignment="Top" />
+                        <local:MyButton x:Name="BtnOptionalUpdate" Text="{DynamicResource Setup.Update.Install}" ColorType="Highlight" Grid.Row="0"
+                                        Grid.RowSpan="2" Grid.Column="3" HorizontalAlignment="Right"
+                                        VerticalAlignment="Stretch" MinWidth="85" MaxWidth="230" />
+                        <TextBlock x:Name="TextOptionalChangelog"
+                                    Text="{DynamicResource Setup.Update.OtherOptions.Placeholder}"
+                                   Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="4" TextWrapping="Wrap" />
+                        <local:MyTextButton x:Name="BtnOptionalChangelogDetail" Text="{DynamicResource Setup.Update.Changelog.MoreInfo}" FontWeight="Thin"
+                                            Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="4" HorizontalAlignment="Left"
+                                            VerticalAlignment="Center" />
+                    </Grid>
+                </StackPanel>
+            </local:MyCard>
+        </StackPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>
