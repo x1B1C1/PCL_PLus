@@ -1,0 +1,321 @@
+﻿<local:MyPageRight x:Class="PCL.Pages.PageLunar.PageLunarLaunch"
+                   xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                   xmlns:local="clr-namespace:PCL.Controls"
+                   PanScroll="{Binding ElementName=PanBack}">
+    <local:MyPageRight.Resources>
+        <!--
+            账号下拉框里的一项：上面账号名，下面 UUID。
+            必须做成 DataTemplate —— 直接塞控件的话，同一个控件没法同时挂在
+            「下拉列表里那一项」和「收起后显示的那一格」上，WPF 只认一个父级。
+        -->
+        <DataTemplate x:Key="LunarAccountItemTemplate">
+            <StackPanel Margin="0,2,0,2">
+                <TextBlock Text="{Binding Title}" FontSize="12.5"
+                           TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding Subtitle}" FontSize="10" Opacity="0.55" Margin="0,1,0,0"
+                           TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+        </DataTemplate>
+    </local:MyPageRight.Resources>
+    <local:MyScrollViewer x:Name="PanBack" HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto">
+        <StackPanel x:Name="PanMain" Margin="25,10">
+
+            <!--  启动  -->
+            <local:MyCard Margin="0,15" Title="{DynamicResource Lunar.Card.Launch}">
+                <StackPanel Margin="20,40,20,18">
+
+                    <!--  状态行：圆点 + 主状态 + 补充说明  -->
+                    <Grid Margin="6,0,6,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Ellipse x:Name="ShapeDot" Grid.Column="0"
+                                 Width="9" Height="9" Margin="0,4,10,0"
+                                 VerticalAlignment="Top"
+                                 Fill="{DynamicResource ColorBrushGray4}" />
+                        <StackPanel Grid.Column="1">
+                            <TextBlock x:Name="LabStatusLine" FontSize="13.5" FontWeight="Bold"
+                                       TextWrapping="Wrap" Text="{DynamicResource Lunar.Left.Detecting}" />
+                            <TextBlock x:Name="LabStatusDetail" FontSize="11" Opacity="0.62"
+                                       Margin="0,4,0,0" TextWrapping="Wrap" LineHeight="15" Text="" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!--
+                        物料准备进度条。InstallPercent < 0 时整行隐藏（不在准备阶段，
+                        或当前阶段没有条数概念如 JRE）；宽度在代码后置里按百分比设。
+                    -->
+                    <Grid x:Name="PanInstallProgress" Height="4" Margin="14,0,14,10"
+                          Visibility="Collapsed">
+                        <Border Background="{DynamicResource ColorBrushGray4}" CornerRadius="2" />
+                        <Rectangle x:Name="RectInstallProgress" HorizontalAlignment="Left"
+                                   RadiusX="2" RadiusY="2"
+                                   Fill="{DynamicResource ColorBrush3}" Width="0" />
+                    </Grid>
+
+                    <!--  选择区 + 信息块：标签与值分列，值过长时省略并用 ToolTip 显示全文  -->
+                    <Border Background="{DynamicResource ColorBrushTransparentBackground}"
+                            CornerRadius="5" Padding="14,12" Margin="6,0,6,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="70" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <!--  版本  -->
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="{DynamicResource Lunar.Field.Version}"
+                                       VerticalAlignment="Center"
+                                       FontSize="11.5" Opacity="0.55" Margin="0,0,10,9" />
+                            <local:MyComboBox Grid.Row="0" Grid.Column="1" x:Name="ComboVersion"
+                                              Height="28" Margin="0,0,10,9"
+                                              SelectionChanged="ComboVersion_SelectionChanged"
+                                              ToolTip="{DynamicResource Lunar.Tip.Version}" />
+                            <local:MyButton Grid.Row="0" Grid.Column="2" x:Name="BtnRefreshVersions"
+                                            Height="28" MinWidth="72" Margin="0,0,0,9"
+                                            Text="{DynamicResource Lunar.Action.Refresh}" Click="BtnRefreshVersions_Click" />
+
+                            <!--
+                                Loader：每个版本能选的注入方案不一样（OptiFine / 原版 / Fabric / Forge），
+                                由服务端 modules 决定，这里按服务端返回动态生成可点击的胶囊按钮。
+                                选中的那个直接决定启动时请求哪份物料清单。
+                            -->
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Loader"
+                                       VerticalAlignment="Center"
+                                       FontSize="11.5" Opacity="0.55" Margin="0,0,10,9" />
+                            <WrapPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
+                                       x:Name="PanLoaders" Margin="0,0,0,9" />
+
+                            <!--  账号  -->
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="{DynamicResource Lunar.Left.Account}"
+                                       VerticalAlignment="Center"
+                                       FontSize="11.5" Opacity="0.55" Margin="0,0,10,9" />
+                            <local:MyComboBox Grid.Row="2" Grid.Column="1"
+                                              x:Name="ComboAccount" Height="44" Margin="0,0,10,9"
+                                              SelectionChanged="ComboAccount_SelectionChanged"
+                                              ToolTip="{DynamicResource Lunar.Tip.Account}" />
+                            <!--
+                                登录入口只作用于「Lunar 身份账号」那一组：用 Lunar 自己的 Azure 应用
+                                走设备码，产出的 refreshToken 游戏端才认。和 PCL 主页面的登录是两套。
+                            -->
+                            <local:MyButton Grid.Row="2" Grid.Column="2" x:Name="BtnLoginIdentity"
+                                            Height="28" MinWidth="72" Margin="0,0,0,9"
+                                            VerticalAlignment="Top"
+                                            Text="{DynamicResource Lunar.Action.LoginIdentity}"
+                                            Click="BtnLoginIdentity_Click" />
+
+                            <!--  启动目录  -->
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="{DynamicResource Lunar.Field.GameDir}"
+                                       FontSize="11.5" Opacity="0.55" Margin="0,0,10,7" />
+                            <TextBlock Grid.Row="3" Grid.Column="1" x:Name="LabGameDir"
+                                       FontSize="11.5" Margin="0,0,10,7"
+                                       TextTrimming="CharacterEllipsis" Text=""
+                                       ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+                            <StackPanel Grid.Row="3" Grid.Column="2" Orientation="Horizontal" Margin="0,0,0,7">
+                                <local:MyIconButton x:Name="BtnPickGameDir" Height="22" Width="22" Margin="0,0,6,0"
+                                                    SvgIcon="lucide/folder-open" LogoScale="0.8"
+                                                    ToolTip="{DynamicResource Lunar.Tip.PickGameDir}"
+                                                    Click="BtnPickGameDir_Click" />
+                                <local:MyIconButton x:Name="BtnResetGameDir" Height="22" Width="22"
+                                                    SvgIcon="lucide/rotate-ccw" LogoScale="0.8"
+                                                    ToolTip="{DynamicResource Lunar.Tip.ResetGameDir}"
+                                                    Click="BtnResetGameDir_Click" />
+                            </StackPanel>
+
+                            <!--  物料目录  -->
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="{DynamicResource Lunar.Field.CacheDir}"
+                                       FontSize="11.5" Opacity="0.55" Margin="0,0,10,7" />
+                            <TextBlock Grid.Row="4" Grid.Column="1" x:Name="LabCacheDir"
+                                       FontSize="11.5" Margin="0,0,10,7"
+                                       TextTrimming="CharacterEllipsis" Text=""
+                                       ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+                            <StackPanel Grid.Row="4" Grid.Column="2" Orientation="Horizontal" Margin="0,0,0,7">
+                                <local:MyIconButton x:Name="BtnPickRoot" Height="22" Width="22" Margin="0,0,6,0"
+                                                    SvgIcon="lucide/folder-open" LogoScale="0.8"
+                                                    ToolTip="{DynamicResource Lunar.Tip.PickRoot}"
+                                                    Click="BtnPickRoot_Click" />
+                                <local:MyIconButton x:Name="BtnResetRoot" Height="22" Width="22"
+                                                    SvgIcon="lucide/rotate-ccw" LogoScale="0.8"
+                                                    ToolTip="{DynamicResource Lunar.Tip.ResetRoot}"
+                                                    Click="BtnResetRoot_Click" />
+                            </StackPanel>
+
+                            <!--  Java  -->
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="Java"
+                                       FontSize="11.5" Opacity="0.55" Margin="0,0,10,0" />
+                            <TextBlock Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="2" x:Name="LabJava"
+                                       FontSize="11.5" TextTrimming="CharacterEllipsis" Text="{DynamicResource Lunar.Field.JavaAuto}"
+                                       ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+                        </Grid>
+                    </Border>
+
+                    <!--
+                        账号状态的说明单独占一行并自动换行。
+                        以前把「（会话已过期）」塞在下拉框内容里，文字一长就把右边的
+                        按钮和日志挤歪；换行文本放在这里，多长都只往下长。
+                    -->
+                    <TextBlock x:Name="LabAccountHint" Margin="6,8,6,0" FontSize="11"
+                               Opacity="0.7" TextWrapping="Wrap" LineHeight="15"
+                               Visibility="Collapsed" Text="" />
+
+                    <WrapPanel Margin="0,14,0,0">
+                        <local:MyButton x:Name="BtnLaunch" Height="35" MinWidth="130" Margin="0,0,12,0"
+                                        ColorType="Highlight" Text="{DynamicResource Lunar.Launch}" Click="BtnLaunch_Click" />
+                        <local:MyButton x:Name="BtnOpenRoot" Height="35" MinWidth="130" Margin="0,0,12,0"
+                                        Text="{DynamicResource Lunar.Action.OpenDir}" Click="BtnOpenRoot_Click" />
+                        <local:MyButton x:Name="BtnCopyCommand" Height="35" MinWidth="130"
+                                        Text="{DynamicResource Lunar.Action.CopyCommand}" Click="BtnCopyCommand_Click" />
+                    </WrapPanel>
+                </StackPanel>
+            </local:MyCard>
+
+            <!--  好友与私聊  -->
+            <local:MyCard Margin="0,15" Title="{DynamicResource Lunar.Card.Social}">
+                <StackPanel Margin="20,40,20,18">
+
+                    <Grid Margin="6,0,6,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock x:Name="LabSocialStatus" FontSize="12.5" FontWeight="Bold"
+                                       TextWrapping="Wrap" Text="{DynamicResource Lunar.Social.Offline}" />
+                            <TextBlock x:Name="LabSocialDetail" FontSize="11" Opacity="0.62" Margin="0,3,0,0"
+                                       TextWrapping="Wrap" LineHeight="15" Text="" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <local:MyButton x:Name="BtnSocialConnect" Height="26" MinWidth="76" Margin="0,0,8,0"
+                                            Text="{DynamicResource Lunar.Social.Connect}" Click="BtnSocialConnect_Click" />
+                            <local:MyButton x:Name="BtnSocialRefresh" Height="26" MinWidth="76"
+                                            Text="{DynamicResource Lunar.Social.Refresh}" Click="BtnSocialRefresh_Click" />
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock x:Name="LabFriendsEmpty" Margin="6,2,6,2" FontSize="11.5" Opacity="0.55"
+                               TextWrapping="Wrap" Text="{DynamicResource Lunar.Social.NoFriends}" />
+
+                    <!--
+                        好友行在代码里拼（每个好友一个 MyListItem），这里只留容器。
+                        用普通 ScrollViewer 而不是 MyScrollViewer：它的模板只给纵向滚动条，
+                        正是这里需要的。
+                    -->
+                    <ScrollViewer x:Name="PanFriendsScroll" MaxHeight="190" Margin="0,2,0,0"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel x:Name="PanFriends" />
+                    </ScrollViewer>
+
+                    <StackPanel x:Name="PanChat" Visibility="Collapsed" Margin="0,12,0,0">
+                        <TextBlock x:Name="LabChatTitle" Margin="6,0,6,8" FontSize="12" FontWeight="Bold"
+                                   TextTrimming="CharacterEllipsis" Text="" />
+
+                        <!--
+                            消息区。右侧的 10 像素内边距是留给滚动条的：
+                            PCL 的 ScrollBar 模板是浮在内容上的，不留出来就会把右对齐的
+                            气泡压住（滑块盖在「我」发的消息上面）。
+                        -->
+                        <Border Background="{DynamicResource ColorBrushTransparentBackground}"
+                                CornerRadius="5" Padding="10,10,0,10">
+                            <ScrollViewer x:Name="PanChatScroll" Height="220"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel x:Name="PanMessages" Margin="0,0,10,0" />
+                            </ScrollViewer>
+                        </Border>
+
+                        <!--
+                            输入行。用 MyTextBox 而不是原生 TextBox：原生 TextBox 在深色主题下
+                            是「白底 + 白字」，打进去的字完全看不见；MyTextBox 自带主题背景、
+                            圆角和 HintText 占位提示。
+                        -->
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <local:MyTextBox x:Name="TxtChatInput" Grid.Column="0" Height="32" Margin="0,0,10,0"
+                                             MaxLength="500" FontSize="12.5" CornerRadius="4"
+                                             HintText="{DynamicResource Lunar.Social.Placeholder}"
+                                             ShowValidateResult="False"
+                                             KeyDown="TxtChatInput_KeyDown" />
+                            <local:MyButton x:Name="BtnChatSend" Grid.Column="1" Height="32" MinWidth="80"
+                                            ColorType="Highlight"
+                                            Text="{DynamicResource Lunar.Social.Send}" Click="BtnChatSend_Click" />
+                        </Grid>
+                    </StackPanel>
+
+                </StackPanel>
+            </local:MyCard>
+
+            <!--
+                说明。
+                这里刻意只留一句概述 + 一个跳转入口：Lunar 相关逻辑改动很频繁，
+                以前逐条列了 8 行「不经过官方启动器 / Loader 由服务端下发 / 好友面板还没做」，
+                没多久就全过时了（好友与私聊后来做出来了，那行还写着「还没做」）。
+                细节统一维护在仓库的 docs/LUNAR.md，改文档不用发版。
+            -->
+            <local:MyCard Margin="0,15" Title="{DynamicResource Lunar.Card.Notes}">
+                <StackPanel Margin="20,40,20,18">
+                    <TextBlock TextWrapping="Wrap" LineHeight="20" Margin="6,0,6,0" Opacity="0.85"
+                               Text="{DynamicResource Lunar.Note.Brief}" />
+                    <local:MyTextButton x:Name="BtnLunarDocs" Margin="6,8,0,0" HorizontalAlignment="Left"
+                                        FontSize="12.5" Text="{DynamicResource Lunar.Note.Docs}"
+                                        Click="BtnLunarDocs_Click" />
+                </StackPanel>
+            </local:MyCard>
+
+            <!--  运行日志  -->
+            <local:MyCard Margin="0,15" Title="{DynamicResource Lunar.Card.Log}">
+                <StackPanel Margin="20,40,20,18">
+                    <Grid Margin="6,0,6,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" VerticalAlignment="Center" FontSize="11" Opacity="0.55"
+                                   Text="{DynamicResource Lunar.Log.Desc}" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <local:MyButton x:Name="BtnCopyLog" Height="24" MinWidth="60" Margin="0,0,8,0"
+                                            Text="{DynamicResource Lunar.Action.Copy}" Click="BtnCopyLog_Click" />
+                            <local:MyButton x:Name="BtnExportLog" Height="24" MinWidth="60" Margin="0,0,8,0"
+                                            Text="{DynamicResource Lunar.Action.Export}" Click="BtnExportLog_Click" />
+                            <local:MyButton x:Name="BtnClearLog" Height="24" MinWidth="60"
+                                            Text="{DynamicResource Lunar.Action.Clear}" Click="BtnClearLog_Click" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!--
+                        这里刻意不用 MyScrollViewer：它的模板里只有纵向滚动条
+                        （CanHorizontallyScroll=False），长行会被直接切掉、也拖不出来。
+                        TextBox 自己的模板两条滚动条都有，而且不套一层 ScrollViewer
+                        才不会把左键拖动选中抢走。
+                    -->
+                    <Border Background="{DynamicResource ColorBrushTransparentBackground}"
+                            CornerRadius="5" Padding="10">
+                        <TextBox x:Name="TextLog" Height="230" IsReadOnly="True" BorderThickness="0"
+                                 Background="Transparent" FontFamily="Consolas" FontSize="11.5"
+                                 Foreground="{DynamicResource ColorBrush1}"
+                                 CaretBrush="{DynamicResource ColorBrush1}"
+                                 SelectionBrush="{DynamicResource ColorBrush2}"
+                                 IsReadOnlyCaretVisible="True" TextWrapping="NoWrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 HorizontalScrollBarVisibility="Auto" />
+                    </Border>
+                </StackPanel>
+            </local:MyCard>
+
+        </StackPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>
