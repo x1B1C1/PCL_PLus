@@ -1,0 +1,73 @@
+name: Build (CI)
+
+# 每次推到 main / beta 或提 PR 时验证「能不能编译」。
+# 不做 publish、不发布产物 —— 发版走 release.yml。
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main, beta]
+    paths-ignore: &ignored
+      - '**/*.md'
+      - '**/LICENSE*'
+      - '**/NOTICE'
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
+  pull_request:
+    paths-ignore: *ignored
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build x64
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Read metadata version
+        id: meta
+        shell: pwsh
+        run: |
+          $raw = [IO.File]::ReadAllText('Plain Craft Launcher 2/metadata.json', [Text.Encoding]::UTF8)
+          $meta = $raw.TrimStart([char]0xFEFF) | ConvertFrom-Json
+          $base = $meta.version.base
+          $suffix = $meta.version.suffix
+          $ver = if ([string]::IsNullOrWhiteSpace($suffix)) { $base } else { "$base-$suffix" }
+          Write-Host "版本：$ver（code $($meta.version.code)）"
+          "version=$ver" >> $env:GITHUB_OUTPUT
+
+      - name: Build
+        shell: pwsh
+        env:
+          # 源码生成器只在 PCL_WRITE_SECRET 存在时注入 PCL_* 环境变量；
+          # CI 用仓库 secret，没有 secret 时就注入空串（编译照样通过，只是登录功能不可用）。
+          PCL_WRITE_SECRET: '1'
+          PCL_MS_CLIENT_ID: ${{ secrets.CLIENT_ID }}
+        run: |
+          dotnet build "Plain Craft Launcher 2/Plain Craft Launcher 2.csproj" -c Debug -p:Platform=x64 --nologo
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Report
+        shell: pwsh
+        run: |
+          Write-Host "构建通过：${{ steps.meta.outputs.version }}" -ForegroundColor Green
