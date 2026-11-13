@@ -402,6 +402,31 @@ public static partial class Config
         /// <summary>
         /// 背景内容。
         /// </summary>
+        [ConfigGroup("TahoeGlass")] partial class TahoeGlassConfigGroup
+        {
+            [ConfigItem<bool>("UiTahoeGlassEnabled", false, ConfigSource.Local)] public partial bool IsEnabled { get; set; }
+            [ConfigItem<bool>("UiTahoeGlassDesktopBackdrop", false, ConfigSource.Local)] public partial bool UseDesktopBackdrop { get; set; }
+            [ConfigItem<int>("UiTahoeGlassPreset", 1, ConfigSource.Local)] public partial int PerformancePreset { get; set; }
+            [ConfigItem<int>("UiTahoeGlassFrameRate", 60, ConfigSource.Local)] public partial int MaximumFrameRate { get; set; }
+            [ConfigItem<int>("UiTahoeGlassFrost", 8, ConfigSource.Local)] public partial int FrostRadius { get; set; }
+            [ConfigItem<int>("UiTahoeGlassRefraction", 5, ConfigSource.Local)] public partial int RefractionStrength { get; set; }
+            [ConfigItem<int>("UiTahoeGlassRefractionPercent", -1, ConfigSource.Local)] public partial int RefractionPercent { get; set; }
+            [ConfigItem<int>("UiTahoeGlassSamplingFrameRate", -1, ConfigSource.Local)] public partial int SamplingFrameRate { get; set; }
+            [ConfigItem<int>("UiTahoeGlassSamplingQuality", 100, ConfigSource.Local)] public partial int SamplingQuality { get; set; }
+            [ConfigItem<int>("UiTahoeGlassBlurRadius", -1, ConfigSource.Local)] public partial int BlurRadius { get; set; }
+            [ConfigItem<int>("UiTahoeGlassDispersion", -1, ConfigSource.Local)] public partial int Dispersion { get; set; }
+            [ConfigItem<int>("UiTahoeGlassHighlight", -1, ConfigSource.Local)] public partial int Highlight { get; set; }
+            [ConfigItem<int>("UiTahoeGlassDiffuse", -1, ConfigSource.Local)] public partial int Diffuse { get; set; }
+            [ConfigItem<int>("UiTahoeGlassEdgeSharpness", -1, ConfigSource.Local)] public partial int EdgeSharpness { get; set; }
+            [ConfigItem<int>("UiTahoeGlassTintScale", 100, ConfigSource.Local)] public partial int TintScale { get; set; }
+            [ConfigItem<int>("UiTahoeGlassCardOpacity", -1, ConfigSource.Local)] public partial int CardOpacity { get; set; }
+            [ConfigItem<int>("UiTahoeGlassBrightness", 0, ConfigSource.Local)] public partial int Brightness { get; set; }
+            [ConfigItem<int>("UiTahoeGlassCardBrightness", 0, ConfigSource.Local)] public partial int CardBrightness { get; set; }
+            [ConfigItem<int>("UiTahoeGlassMotion", -1, ConfigSource.Local)] public partial int Motion { get; set; }
+            [ConfigItem<bool>("UiTahoeGlassConsent", false, ConfigSource.Local)] public partial bool PerformanceConsent { get; set; }
+            [ConfigItem<bool>("UiTahoeGlassDesktopConsent", false, ConfigSource.Local)] public partial bool DesktopCaptureConsent { get; set; }
+        }
+
         [ConfigGroup("Background")] partial class BackgroundConfigGroup
         {
             /// <summary>
