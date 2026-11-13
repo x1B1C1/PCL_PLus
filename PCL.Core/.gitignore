@@ -260,7 +260,9 @@ Generated_Code/
 # to a newer Visual Studio version. Backup files are not needed,
 # because we have git ;-)
 _UpgradeReport_Files/
-Backup*/
+# Backup*/ 会连带忽略 Saves/Backups 源码，只保留精确的 VS 升级备份名。
+Backup~*/
+*_Backup/
 UpgradeLog*.XML
 UpgradeLog*.htm
 ServiceFabricBackup/
