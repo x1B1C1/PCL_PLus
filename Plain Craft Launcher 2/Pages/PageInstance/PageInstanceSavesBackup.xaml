@@ -1,0 +1,56 @@
+<local:MyPageRight
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:PCL.Controls" xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:val="https://ce.pclc.cc/core/utils/validate"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d" x:Class="PCL.Pages.PageInstance.PageInstanceSavesBackup"
+    PanScroll="{Binding ElementName=PanBack}" Grid.IsSharedSizeScope="True">
+    <local:MyScrollViewer x:Name="PanBack" VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="25,10,25,10" x:Name="PanContent">
+
+            <local:MyCard Margin="0,15,0,15" x:Name="CardBackupSettings" CanSwap="True" IsSwapped="False"
+                          Title="{DynamicResource Instance.Saves.Backup.Title}">
+                <StackPanel Margin="25,40,15,20">
+                    <local:MyCheckBox x:Name="CheckBackupAuto"
+                                      Text="{DynamicResource Instance.Saves.Backup.AutoEnabled}" />
+                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                        <TextBlock Text="{DynamicResource Instance.Saves.Backup.RetentionPrefix}"
+                                   VerticalAlignment="Center" />
+                        <local:MyTextBox x:Name="TextBackupRetention" Width="65" MaxLength="2" Margin="8,0"
+                                         HorizontalContentAlignment="Center" ShowValidateResult="False">
+                            <local:MyTextBox.ValidateRules>
+                                <val:IntValidator Min="1" Max="50" />
+                            </local:MyTextBox.ValidateRules>
+                        </local:MyTextBox>
+                        <TextBlock Text="{DynamicResource Instance.Saves.Backup.RetentionSuffix}"
+                                   VerticalAlignment="Center" Margin="8,0,0,0" />
+                    </StackPanel>
+                    <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" FontSize="12"
+                               Foreground="{DynamicResource ColorBrushGray4}"
+                               Text="{DynamicResource Instance.Saves.Backup.RetentionTip}" />
+                </StackPanel>
+            </local:MyCard>
+
+            <local:MyCard Margin="0,0,0,15" x:Name="CardBackups" CanSwap="True" IsSwapped="False"
+                          Title="{DynamicResource Instance.Saves.Backup.PointsTitle}">
+                <Grid>
+                    <StackPanel Margin="0,13,15,0" Orientation="Horizontal" VerticalAlignment="Top"
+                                HorizontalAlignment="Right" Height="28">
+                        <local:MyIconTextButton x:Name="BtnBackupAll"
+                                                Text="{DynamicResource Instance.Saves.Backup.CreateAll}"
+                                                SvgIcon="lucide/archive" />
+                    </StackPanel>
+                </Grid>
+                <StackPanel Margin="20,48,15,15">
+                    <TextBlock x:Name="LabBackupsEmpty" Margin="5,2,0,12" TextWrapping="Wrap" FontSize="12"
+                               Foreground="{DynamicResource ColorBrushGray4}"
+                               Text="{DynamicResource Instance.Saves.Backup.Empty}" />
+                    <StackPanel x:Name="PanBackups" />
+                </StackPanel>
+            </local:MyCard>
+
+        </StackPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>
