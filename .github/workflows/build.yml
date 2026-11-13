@@ -71,3 +71,11 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "构建通过：${{ steps.meta.outputs.version }}" -ForegroundColor Green
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: PCL_Plus-Debug-x64-${{ github.run_number }}
+          path: Plain Craft Launcher 2/bin/Debug/net10.0-windows/
+          if-no-files-found: error
+          retention-days: 14

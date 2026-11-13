@@ -12,6 +12,8 @@ permissions:
   contents: write
 
 on:
+  push:
+    tags: ['v[0-9]*']
   workflow_dispatch:
     inputs:
       draft:
@@ -36,6 +38,7 @@ jobs:
   release:
     name: Publish
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -83,6 +86,26 @@ jobs:
           "line=$line" >> $env:GITHUB_OUTPUT
           "prerelease=$($line -eq 'Beta')" >> $env:GITHUB_OUTPUT
 
+      - name: Validate release tag
+        shell: pwsh
+        env:
+          EXPECTED_TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -cne $env:EXPECTED_TAG) {
+            throw "标签 $env:GITHUB_REF_NAME 与 metadata.json 版本不一致，应为 $env:EXPECTED_TAG"
+          }
+          git show-ref --verify --quiet "refs/tags/$env:EXPECTED_TAG"
+          if ($LASTEXITCODE -eq 0) {
+            $tagCommit = git rev-parse "$($env:EXPECTED_TAG)^{commit}"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            if ($tagCommit -ne $env:GITHUB_SHA) {
+              throw "标签 $env:EXPECTED_TAG 已指向其他提交，请更新版本后发布"
+            }
+          } elseif ($LASTEXITCODE -ne 1) {
+            exit $LASTEXITCODE
+          }
+          exit 0
+
       - name: Publish single-file exe
         shell: pwsh
         env:
@@ -91,7 +114,6 @@ jobs:
         run: |
           # 生成器只在「环境变量变化」之外还依赖编译期输入，增量编译拿不到新 secret，
           # 所以每次发版都从干净目录开始。
-          Remove-Item obj, bin -Recurse -Force -ErrorAction SilentlyContinue
           dotnet publish "Plain Craft Launcher 2/Plain Craft Launcher 2.csproj" `
             -c Release -p:Platform=x64 -r win-x64 --no-self-contained `
             -o dist --nologo
@@ -136,6 +158,18 @@ jobs:
           Copy-Item $notes 'dist/notes.md' -Force
           Write-Host "使用发布说明：$notes"
 
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: PCL_Plus-${{ steps.meta.outputs.tag }}-x64
+          path: |
+            PCL_Plus_*.exe
+            PCL_Plus_*.exe.sha256
+            dist/*.zip
+            dist/notes.md
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Create Release on source repository
         shell: pwsh
         env:
@@ -145,7 +179,8 @@ jobs:
           LINE: ${{ steps.meta.outputs.line }}
           DRAFT: ${{ inputs.draft }}
         run: |
-          $ghArgs = @('release', 'create', $env:TAG, '--title', "PCL_Plus $env:VERSION", '--notes-file', 'dist/notes.md')
+          $ghArgs = @('release', 'create', $env:TAG, '--repo', $env:GITHUB_REPOSITORY,
+                    '--target', $env:GITHUB_SHA, '--title', "PCL_Plus $env:VERSION", '--notes-file', 'dist/notes.md')
           if ($env:LINE -eq 'Beta') { $ghArgs += '--prerelease' }
           if ($env:DRAFT -eq 'true') { $ghArgs += '--draft' }
 
