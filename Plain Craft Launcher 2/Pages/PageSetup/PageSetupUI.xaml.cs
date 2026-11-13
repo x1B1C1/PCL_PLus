@@ -67,7 +67,8 @@ public partial class PageSetupUI
             SliderGlassHighlight.Value = Config.Preference.Theme.LiquidGlassHighlight;
             SliderGlassRefraction.Value = Config.Preference.Theme.LiquidGlassRefraction;
             SliderGlassDispersion.Value = Config.Preference.Theme.LiquidGlassDispersion;
-            PanGlassValue.Visibility = CheckLiquidGlass.Checked == true ? Visibility.Visible : Visibility.Collapsed;
+            PanGlassValue.Visibility = Visibility.Collapsed;
+            RefreshLiquidGlassSettings();
             CheckAcrylic.Checked = Config.Preference.Theme.AcrylicEnabled;
             CheckLockWindowSize.Checked = Config.Preference.LockWindowSize;
             RefreshWindowSize();

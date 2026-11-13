@@ -8,7 +8,7 @@ using FluentValidation;
 using PCL.Core.App.Localization;
 namespace PCL.Controls;
 
-public class MyTextBox : TextBox
+public partial class MyTextBox : TextBox
 {
     public delegate void ValidateChangedEventHandler(object sender, EventArgs e);
 
@@ -52,6 +52,7 @@ public class MyTextBox : TextBox
 
     public MyTextBox()
     {
+        InitializeTahoeTextBox();
         Loaded += (_, _) => Validate();
         TextChanged += (a, b) => MyTextBox_TextChanged((MyTextBox)a, b);
         IsEnabledChanged += (_, _) => RefreshColor();
@@ -78,8 +79,7 @@ public class MyTextBox : TextBox
         get
         {
             if (Template is null) return null;
-            if (field is null) field = (TextBlock)Template.FindName("labWrong", this);
-            return field;
+            return Template.FindName("labWrong", this) as TextBlock;
         }
     }
 
@@ -88,8 +88,7 @@ public class MyTextBox : TextBox
         get
         {
             if (Template is null) return null;
-            if (field is null) field = (TextBlock)Template.FindName("labHint", this);
-            return field;
+            return Template.FindName("labHint", this) as TextBlock;
         }
     }
 
@@ -131,7 +130,7 @@ public class MyTextBox : TextBox
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
-        if (string.IsNullOrEmpty(HintText) || !string.IsNullOrEmpty(labHint.Text))
+        if (string.IsNullOrEmpty(HintText) || labHint is null || !string.IsNullOrEmpty(labHint.Text))
             return;
         UpdateHintText();
     }
@@ -307,6 +306,7 @@ public class MyTextBox : TextBox
             // 不对 ComboBox 从属进行动画
             if (TemplatedParent is not null && TemplatedParent is MyComboBox)
                 return;
+            if (RefreshTahoeTextBoxChrome()) return;
             // 判断当前颜色
             string foreColorName;
             string backColorName;
@@ -378,8 +378,9 @@ public class MyTextBox : TextBox
 
     private void RefreshTextColor()
     {
+        if (RefreshTahoeTextBoxChrome()) return;
         var newColor = IsEnabled ? ThemeManager.colorGray1 : ThemeManager.colorGray4;
-        if (((SolidColorBrush)Foreground).Color.R == newColor.r)
+        if (Foreground is SolidColorBrush current && current.Color == (Color)newColor)
             return;
         if (IsLoaded && ModAnimation.AniControlEnabled == 0 && !string.IsNullOrEmpty(Text))
         {

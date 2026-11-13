@@ -52,6 +52,8 @@ public class ModSetup
             _ => GlassHelper.RefreshParams()));
         Config.Preference.Theme.AcrylicEnabledConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
             _ => AcrylicHelper.Apply(ModMain.frmMain)));
+        ConfigService.RegisterObserver(Config.Preference.TahoeGlass,
+            new ConfigObserver(ConfigEvent.Changed, _ => ModBase.RunInUi(LiquidGlassCore.Refresh)));
         Config.Preference.Background.BackgroundColorfulConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
             e => UiBackgroundColorful((bool)e.Value!)));
         Config.Preference.LockWindowSizeConfig.Observe(new ConfigObserver(ConfigEvent.Changed,
@@ -169,7 +171,6 @@ public class ModSetup
 
         // [修改] 玻璃效果整体移除：窗口亚克力与按钮液态玻璃都不再启用。
         Config.Preference.Theme.AcrylicEnabled = false;
-        Config.Preference.Theme.LiquidGlassEnabled = false;
         AcrylicHelper.Apply(ModMain.frmMain);
         GlassHelper.RefreshAll();
 
@@ -275,7 +276,7 @@ public class ModSetup
     // 启动器
     public static void UiLauncherTransparent(int value)
     {
-        ModMain.frmMain.Opacity = value / 1000d + 0.4d;
+        LiquidGlassCore.ApplyOpacity(value);
     }
 
     public static void UiLauncherTheme(int value)
@@ -569,7 +570,7 @@ public class ModSetup
 
     public static void UiBlurValue(int value)
     {
-        System.Windows.Application.Current.Resources["BlurRadius"] = value * 1.0d;
+        System.Windows.Application.Current.Resources["BlurRadius"] = LiquidGlassCore.IsEnabled ? 0d : value * 1.0d;
     }
 
     public static void UiBlurSamplingRate(int value)

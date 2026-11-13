@@ -9,7 +9,7 @@ using PCL.Core.UI.Controls;
 
 namespace PCL.Controls;
 
-public class MyCard : AnimatedBackgroundGrid
+public partial class MyCard : AnimatedBackgroundGrid
 {
     // 动画（v1.5：只保留一层柔和投影，悬停时加深但不刺眼）
     private const double dropShadowIdleOpacity = 0.05d;
@@ -48,6 +48,8 @@ public class MyCard : AnimatedBackgroundGrid
         // 设置背景色
         SetResourceReference(BackgroundBrushProperty, "ColorBrushTransparentBackground");
         Loaded += (_, _) => Init();
+        Loaded += OnTahoeCardLoaded;
+        Unloaded += OnTahoeCardUnloaded;
         MouseEnter += MyCard_MouseEnter;
         MouseLeave += MyCard_MouseLeave;
         SizeChanged += MySizeChanged;
@@ -111,7 +113,7 @@ public class MyCard : AnimatedBackgroundGrid
     protected override SolidColorBrush AnimatableBrush
     {
         get => (SolidColorBrush)mainBorder.Background;
-        set => mainBorder.Background = value;
+        set => mainBorder.Background = TahoeThemeManager.IsEnabled ? TahoeContentBrush() : value;
     }
 
     protected override FrameworkElement AnimatableElement => mainBorder;
@@ -196,6 +198,7 @@ public class MyCard : AnimatedBackgroundGrid
 
     private void MyCard_MouseEnter(object sender, MouseEventArgs e)
     {
+        if (TahoeThemeManager.IsEnabled || ThemeControlRegistry.HasTemplate(this)) return;
         if (!HasMouseAnimation)
             return;
         var aniList = new List<ModAnimation.AniData>();
@@ -214,6 +217,7 @@ public class MyCard : AnimatedBackgroundGrid
 
     private void MyCard_MouseLeave(object sender, MouseEventArgs e)
     {
+        if (TahoeThemeManager.IsEnabled || ThemeControlRegistry.HasTemplate(this)) return;
         if (!HasMouseAnimation)
             return;
         var aniList = new List<ModAnimation.AniData>();

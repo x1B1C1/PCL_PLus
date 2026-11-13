@@ -37,6 +37,8 @@ public static class ThemeManager
             RefreshTitleBar();
             RefreshBackground();
             RefreshAllContextMenuThemes();
+            TahoeThemeManager.Refresh();
+            CustomThemeRuntime.Current?.Refresh();
         });
     }
 
@@ -85,14 +87,14 @@ public static class ThemeManager
     }
 
     // 主页面背景
-    private static void RefreshBackground()
+    internal static void RefreshBackground()
     {
         if (Config.Preference.Background.BackgroundColorful)
         {
             if (ThemeService.GetCustomThemeArgs() is { } args)
             {
                 // 原版 ThemeRefreshMain 的 UiBackgroundColorful 分支：hue±15、饱和度 80%、明度 91
-                ModMain.frmMain.PanForm.Background = PclThemeEngine.CreateBackgroundBrush(args, IsDarkMode);
+                ModMain.frmMain.LauncherBackgroundLayer.Background = PclThemeEngine.CreateBackgroundBrush(args, IsDarkMode);
             }
             else
             {
@@ -113,15 +115,15 @@ public static class ThemeManager
                     { Offset = 0.4d, Color = LabColor.FromLch(0.96d * darkLight, tone.C7, hue) });
                 brush.GradientStops.Add(new GradientStop
                     { Offset = 1.1d, Color = LabColor.FromLch(0.84d * darkLight, tone.C5, hue2) });
-                ModMain.frmMain.PanForm.Background = brush;
+                ModMain.frmMain.LauncherBackgroundLayer.Background = brush;
             }
         }
         else
         {
-            ModMain.frmMain.PanForm.Background = (Brush)System.Windows.Application.Current.Resources["ColorBrushBackground"];
+            ModMain.frmMain.LauncherBackgroundLayer.Background = (Brush)System.Windows.Application.Current.Resources["ColorBrushBackground"];
         }
 
-        ModMain.frmMain.PanForm.Background.Freeze();
+        ModMain.frmMain.LauncherBackgroundLayer.Background.Freeze();
     }
 
     // 通用ContextMenu主题刷新

@@ -68,13 +68,14 @@ public static class GlassHelper
     /// <summary>
     /// 当前是否启用液态玻璃。
     /// </summary>
-    public static bool IsEnabled => Config.Preference.Theme.LiquidGlassEnabled;
+    public static bool IsEnabled => false;
 
     static GlassHelper()
     {
         // 主题/明暗切换后重挂玻璃，按钮底色与玻璃参数都重新跟随主题。
         ThemeService.ColorModeChanged += (_, _) => RefreshAll();
         ThemeService.ColorThemeChanged += _ => RefreshAll();
+        LiquidGlassCore.Changed += (_, _) => RefreshAll();
     }
 
     #region 入口

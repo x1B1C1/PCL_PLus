@@ -2,6 +2,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="clr-namespace:PCL.Controls"
+    xmlns:theme="clr-namespace:PCL.Modules.UI.Theme"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:controls="clr-namespace:PCL.Core.UI.Controls;assembly=PCL.Core"
@@ -25,13 +26,14 @@
             CornerRadius="12"
             GlassFrameThickness="0" />
     </WindowChrome.WindowChrome>
-    <Grid SnapsToDevicePixels="True" UseLayoutRounding="True" Background="{DynamicResource ColorBrushBackground}">
+    <Grid SnapsToDevicePixels="True" UseLayoutRounding="True">
         <Grid.RenderTransform>
             <TransformGroup>
                 <RotateTransform x:Name="TransformRotate" Angle="-4" />
                 <TranslateTransform x:Name="TransformPos" X="0" Y="60" />
             </TransformGroup>
         </Grid.RenderTransform>
+        <Grid x:Name="PanWindowShadow" Visibility="Collapsed" IsHitTestVisible="False">
         <Rectangle Stroke="{x:Null}" StrokeThickness="0.0001" IsHitTestVisible="False" Height="10" VerticalAlignment="Top" Margin="16,0">
             <Rectangle.Fill>
                 <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
@@ -100,6 +102,7 @@
                 </RadialGradientBrush>
             </Rectangle.Fill>
         </Rectangle>
+        </Grid>
         <Border x:Name="PanBack" Margin="0">
             <Border.Background>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
@@ -116,13 +119,21 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition />
                 </Grid.RowDefinitions>
-                <Canvas x:Name="ImgBack" IsHitTestVisible="False" Grid.Row="1"
+                <Grid x:Name="TahoeBackdrop" Grid.RowSpan="2" IsHitTestVisible="False" ClipToBounds="True">
+                    <Grid.RowDefinitions><RowDefinition Height="48" /><RowDefinition /></Grid.RowDefinitions>
+                    <Image x:Name="TahoeDesktopImage" Grid.RowSpan="2" Stretch="Fill" Visibility="Collapsed" />
+                    <Border x:Name="LauncherBackgroundLayer" Grid.RowSpan="2" />
+                    <Border x:Name="TahoeWallpaperHost" Grid.Row="1">
+                <Canvas x:Name="ImgBack" IsHitTestVisible="False"
                         RenderOptions.BitmapScalingMode="LowQuality">
                     <MediaElement x:Name="VideoBack" LoadedBehavior="Manual" UnloadedBehavior="Stop"
                                   Stretch="UniformToFill" IsHitTestVisible="False" Visibility="Visible"
                                   MediaEnded="VideoEnded" Volume="0" />
                 </Canvas>
-                <local:AnimatedBackgroundGrid Grid.Row="0" x:Name="PanTitle" Height="48"
+                    </Border>
+                </Grid>
+                <local:TahoeGlassSurface x:Name="TahoeWindowGlass" Grid.RowSpan="2" CornerRadius="22" Visibility="Collapsed" />
+                <local:LiquidGlassTitleBar Grid.Row="0" x:Name="PanTitle" Height="48"
                                               MouseLeftButtonDown="FormDragMove"
                                               WindowChrome.IsHitTestVisibleInChrome="True"
                                               BackgroundBrush="{DynamicResource ColorBrushTransparentBackground}">
@@ -131,6 +142,9 @@
                     <!--         <GradientStop Color="{StaticResource ColorObject4}" Offset="0"/> -->
                     <!--     </LinearGradientBrush> -->
                     <!-- </Grid.Background> -->
+                    <local:TahoeGlassSurface x:Name="TahoeToolbar" Margin="8,5" CornerRadius="19" Visibility="Collapsed" />
+                    <local:TahoeGlassSurface x:Name="TahoeWindowControls" Width="66" HorizontalAlignment="Right"
+                                             Margin="0,7,8,7" CornerRadius="17" Visibility="Collapsed" />
                     <Rectangle x:Name="ImgTitleGradient" IsHitTestVisible="False" />
                     <local:MyImage x:Name="ImgTitle" IsHitTestVisible="False" Stretch="UniformToFill" IsEnabled="False" RenderOptions.BitmapScalingMode="LowQuality" />
                     <local:MyIconButton x:Name="BtnTitleClose" HorizontalAlignment="Right" Height="28" VerticalAlignment="Center" Width="28" Margin="0,0,12,0" Theme="White" Click="BtnTitleClose_Click"
@@ -164,7 +178,8 @@
                                        Foreground="White" IsHitTestVisible="False"
                                        SnapsToDevicePixels="True" UseLayoutRounding="True" />
                         </Grid>
-                        <StackPanel Grid.Column="1" x:Name="PanTitleSelect" HorizontalAlignment="Left" Height="30"
+                        <Grid Grid.Column="1" x:Name="PanTitleSelectViewport">
+                        <StackPanel x:Name="PanTitleSelect" HorizontalAlignment="Left" Height="30"
                                     VerticalAlignment="Center" Orientation="Horizontal" Margin="14,0">
                             <local:MyRadioButton x:Name="BtnTitleSelect0" Text="{DynamicResource Main.Tab.Launch}" Tag="0" Margin="5,0" Checked="True"
                                                  Padding="2,0" Check="BtnTitleSelect_Click"
@@ -183,6 +198,7 @@
                                                  LogoScale="1"
                                                  SvgIcon="lucide/wrench" />
                         </StackPanel>
+                        </Grid>
                     </Grid>
                     <Grid x:Name="PanTitleInner" Visibility="Collapsed" Margin="-16,0,0,0" Opacity="0"
                           HorizontalAlignment="Left" Width="{Binding ActualWidth, ElementName=PanTitle, Mode=OneWay}">
@@ -194,7 +210,7 @@
                                    VerticalAlignment="Center" Margin="47,1,60,0" HorizontalAlignment="Left"
                                    Foreground="White" FontSize="15" />
                     </Grid>
-                </local:AnimatedBackgroundGrid>
+                </local:LiquidGlassTitleBar>
                 <Grid x:Name="PanLeft" Grid.Row="1" HorizontalAlignment="Left" SnapsToDevicePixels="True">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -202,7 +218,9 @@
                     </Grid.ColumnDefinitions>
                     <controls:BlurBorder IsHitTestVisible="False">
                         <local:AnimatedBackgroundGrid x:Name="RectLeftBackground" Width="0"
-                                                      BackgroundBrush="{DynamicResource ColorBrushTransparentBackground}" />
+                                                      BackgroundBrush="{DynamicResource ColorBrushTransparentBackground}">
+                            <local:TahoeGlassSurface x:Name="TahoeSidebar" Margin="8,3,6,8" CornerRadius="22" Visibility="Collapsed" />
+                        </local:AnimatedBackgroundGrid>
                     </controls:BlurBorder>
                     <Rectangle x:Name="RectLeftShadow" Width="4" HorizontalAlignment="Left" IsHitTestVisible="False"
                                Grid.Column="1">

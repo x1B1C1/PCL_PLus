@@ -131,6 +131,8 @@ public partial class FormMain
             _helper.DragDrop += (_, _) => FileDrag(_helper.DropFilePaths);
         }
 
+        _ = CustomThemeRuntime.InitializeAsync(this);
+
         if (ModMain.frmLaunchLeft.Parent is not null)
             ModMain.frmLaunchLeft.SetValue(ContentPresenter.ContentProperty, null);
         if (ModMain.frmLaunchRight.Parent is not null)
@@ -209,7 +211,9 @@ public partial class FormMain
         ModAnimation.AniStart(new[]
         {
             ModAnimation.AaCode(() => ModAnimation.AniControlEnabled -= 1, 50),
-            ModAnimation.AaOpacity(this, Config.Preference.Theme.WindowOpacity / 1000d + 0.4d, 250, 100),
+            ModAnimation.AaOpacity(this,
+                PCL.Core.UI.LiquidGlassComposition.WindowOpacity(LiquidGlassCore.IsEnabled,
+                    Config.Preference.Theme.WindowOpacity), 250, 100),
             ModAnimation.AaDouble(i => TransformPos.Y += (double)i, -TransformPos.Y, 600,
                 100, new ModAnimation.AniEaseOutBack(ModAnimation.AniEasePower.Weak)),
             ModAnimation.AaDouble(i => TransformRotate.Angle += (double)i,
@@ -218,6 +222,7 @@ public partial class FormMain
             {
                 RenderTransform = null;
                 isWindowLoadFinished = true;
+                LiquidGlassCore.Refresh();
                 ModBase.Log(
                     $"[System] DPI：{ModBase.dpi}，系统版本：{Environment.OSVersion.VersionString}，PCL 位置：{Basics.ExecutablePath}");
             }, after: true)

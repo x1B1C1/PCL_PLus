@@ -38,6 +38,8 @@ public partial class MyListItem : IMyRadio
             ContentHandler = null;
         }
 
+        if (RefreshTahoeNavigation(true)) return;
+
         // 判断当前颜色
         string stateNew;
         int time;
@@ -476,6 +478,8 @@ public partial class MyListItem : IMyRadio
         PreviewMouseLeftButtonUp += Button_MouseLeave;
         MouseEnter += RefreshColor;
         MouseLeave += RefreshColor;
+        Loaded += TahoeNavigationLoaded;
+        Unloaded += TahoeNavigationUnloaded;
         MouseLeftButtonDown += RefreshColor;
         MouseLeftButtonUp += RefreshColor;
         Loaded += MyListItem_Loaded;
@@ -874,6 +878,7 @@ public partial class MyListItem : IMyRadio
                 }
             }
 
+            if (RefreshTahoeNavigation(anime)) return;
             var customHeight = 20d; // 修改左侧神秘动画条的高度
 
             if (IsLoaded && ModAnimation.AniControlEnabled == 0 && anime) // 防止默认属性变更触发动画
