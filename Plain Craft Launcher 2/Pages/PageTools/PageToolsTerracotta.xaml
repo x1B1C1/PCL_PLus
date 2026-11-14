@@ -1,0 +1,117 @@
+﻿<local:MyPageRight
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:PCL.Controls" xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d" x:Class="PCL.Pages.PageTools.PageToolsTerracotta"
+    PanScroll="{Binding ElementName=PanBack}" Grid.IsSharedSizeScope="True">
+    <local:MyScrollViewer x:Name="PanBack" VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="25,10,25,10">
+        <local:MyCard x:Name="CardTerracotta" Margin="0,0,0,15" Title="{DynamicResource Tools.Terracotta.Title}">
+            <StackPanel Margin="25,38,25,18">
+                <local:MyCheckBox x:Name="CheckTerracottaEnabled"
+                                  Text="启用陶瓦联机"
+                                  ToolTip="打开后才会加载陶瓦联机附加模块。&#xA;&#xA;关闭时不会启动任何进程、线程或后台轮询，启动器保持原有行为。&#xA;关闭开关只会停止启动器这边的联机会话，不会杀掉可能被其他启动器共享的陶瓦进程；需要彻底停止请点「停止组件」。&#xA;陶瓦联机通过 EasyTier 建立 P2P 连接，只与同一房间内的玩家通信。&#xA;&#xA;默认关闭。"
+                                  Change="TerracottaEnabled_Change" />
+
+                <TextBlock x:Name="LabTerracottaDisabledHint" Margin="0,8,0,0" FontSize="12" TextWrapping="Wrap"
+                           Foreground="{DynamicResource ColorBrushGray2}"
+                           Text="陶瓦联机当前已关闭。开启后可在本页创建或加入房间，无需离开启动器。" />
+
+                <StackPanel x:Name="PanTerracottaOptions" Margin="0,14,0,0" Visibility="Collapsed">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Name1" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="28" />
+                            <RowDefinition Height="10" />
+                            <RowDefinition Height="28" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="程序路径"
+                                   Margin="0,0,20,0" />
+                        <local:MyTextBox x:Name="TextTerracottaPath" Grid.Row="0" Grid.Column="1"
+                                         HintText="留空时自动查找 PCL\Terracotta\terracotta.exe"
+                                         ToolTip="陶瓦联机程序的完整路径。&#xA;也可以把 terracotta.exe 放到 PCL\Terracotta\ 下，让启动器自动检测。"
+                                         TextChanged="TerracottaText_Change" />
+                        <local:MyButton Grid.Row="0" Grid.Column="2" x:Name="BtnTerracottaBrowse" Text="浏览" TextPadding="3"
+                                        MinWidth="62" Margin="10,0,0,0" Click="BtnTerracottaBrowse_Click" />
+                        <local:MyButton Grid.Row="0" Grid.Column="3" x:Name="BtnTerracottaDetect" Text="自动检测" TextPadding="3"
+                                        MinWidth="80" Margin="8,0,0,0" Click="BtnTerracottaDetect_Click" />
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="联机昵称"
+                                   Margin="0,0,20,0" />
+                        <local:MyTextBox x:Name="TextTerracottaName" Grid.Row="2" Grid.Column="1"
+                                         Grid.ColumnSpan="3"
+                                         HintText="可留空，留空时由陶瓦使用默认昵称"
+                                         ToolTip="房间内其他玩家看到的昵称。留空时使用陶瓦默认昵称。"
+                                         TextChanged="TerracottaText_Change" />
+                    </Grid>
+
+                    <TextBlock x:Name="LabTerracottaPathHint" Margin="0,8,0,0" FontSize="12" TextWrapping="Wrap"
+                               Foreground="{DynamicResource ColorBrushGray2}"
+                               Text="状态：未检测程序。" />
+
+                    <WrapPanel Margin="0,12,0,0">
+                        <local:MyCheckBox x:Name="CheckTerracottaAutoStart" Margin="0,0,24,8"
+                                          Text="启动启动器时自动启动"
+                                          ToolTip="启动器打开后自动拉起陶瓦联机组件。&#xA;如果你习惯用其他启动器或手动启动，可以不勾。"
+                                          Change="TerracottaOption_Change" />
+                        <local:MyCheckBox x:Name="CheckTerracottaAutoFill" Margin="0,0,24,8"
+                                          Text="联机成功后自动填入当前版本服务器地址"
+                                          ToolTip="加入房间成功后，把 127.0.0.1:端口 写进当前选中实例的「启动时自动进入服务器」配置。&#xA;下次启动游戏会直接进入该房间。默认关闭。"
+                                          Change="TerracottaOption_Change" />
+                        <local:MyCheckBox x:Name="CheckTerracottaStopOnExit" Margin="0,0,24,8"
+                                          Text="退出启动器时停止陶瓦联机"
+                                          ToolTip="陶瓦是共享的守护进程，可能还有其他启动器在使用。&#xA;默认关闭；需要随启动器一起退出时再勾选。"
+                                          Change="TerracottaOption_Change" />
+                    </WrapPanel>
+
+                    <TextBlock x:Name="LabTerracottaStatus" Margin="0,12,0,0" FontSize="12" TextWrapping="Wrap"
+                               Foreground="{DynamicResource ColorBrushGray2}" Text="状态：未启动" />
+
+                    <Grid Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Name1" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="邀请码"
+                                   Margin="0,0,20,0" />
+                        <local:MyTextBox x:Name="TextTerracottaInvite" Grid.Column="1"
+                                         HintText="U/XXXX-XXXX-XXXX-XXXX"
+                                         ToolTip="加入别人的房间时填写。&#xA;创建房间成功后，自己的邀请码也会自动填到这里。" />
+                        <local:MyButton Grid.Column="2" Text="加入房间" TextPadding="3"
+                                        MinWidth="80" Margin="10,0,0,0" Click="BtnTerracottaJoin_Click" />
+                        <local:MyButton Grid.Column="3" Text="复制邀请码" TextPadding="3"
+                                        MinWidth="80" Margin="8,0,0,0" Click="BtnTerracottaCopyCode_Click" />
+                    </Grid>
+
+                    <WrapPanel Margin="0,10,0,0">
+                        <local:MyButton x:Name="BtnTerracottaStart" Text="启动组件" MinWidth="104" Padding="13,0"
+                                        Margin="0,0,10,8" Click="BtnTerracottaStart_Click" />
+                        <local:MyButton x:Name="BtnTerracottaStop" Text="停止组件" MinWidth="104" Padding="13,0"
+                                        Margin="0,0,10,8" Click="BtnTerracottaStop_Click" />
+                        <local:MyButton x:Name="BtnTerracottaHost" Text="创建房间" MinWidth="104" Padding="13,0"
+                                        Margin="0,0,10,8" Click="BtnTerracottaHost_Click" />
+                        <local:MyButton x:Name="BtnTerracottaReset" Text="断开房间" MinWidth="104" Padding="13,0"
+                                        Margin="0,0,10,8" Click="BtnTerracottaReset_Click" />
+                        <local:MyButton x:Name="BtnTerracottaCopyAddress" Text="复制连接地址" MinWidth="116"
+                                        Padding="13,0" Margin="0,0,10,8" Click="BtnTerracottaCopyAddress_Click" />
+                    </WrapPanel>
+
+                    <TextBlock Margin="0,10,0,0" FontSize="12" TextWrapping="Wrap"
+                               Foreground="{DynamicResource ColorBrushGray2}"
+                               Text="创建房间前，请先在游戏里打开一个单人存档并保持运行；加入房间成功后，把「连接地址」填进游戏的服务器地址即可。&#xA;启动器已内置陶瓦联机运行时（首次使用时会自动释放到本地），无需自行准备。&#xA;陶瓦联机（Terracotta）由 burningtnt 开发，以 AGPL-3.0-or-later 许可发布，随包分发的是未修改的官方二进制；本启动器仅通过其本地 HTTP 接口调用，未修改其代码。源码见仓库 tools/t/，许可全文见 LICENSE-AGPL-3.0。" />
+                </StackPanel>
+            </StackPanel>
+        </local:MyCard>
+        </StackPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>
