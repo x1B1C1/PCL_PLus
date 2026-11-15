@@ -1,0 +1,720 @@
+﻿using System;
+using System.Buffers.Binary;
+using System.Collections.Generic;
+using System.IO;
+using System.Net;
+using System.Net.Sockets;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace PCL.Core.App.Lunar;
+
+/// <summary>
+///     PCL 自己充当 Lunar 的本地 IPC 服务端。
+///     <para>
+///         游戏进程里 <c>lunar.jar</c> 的 AccountManager 在令牌过期时会通过
+///         <c>AuthService/RefreshAccount</c> 找启动器要续期，而这条链路只走
+///         <c>ws://127.0.0.1:&lt;--ipcPort&gt;</c>。PCL 不经过 Lunar 启动器启动游戏时
+///         没人应答，游戏就会弹 <c>Invalid session</c>。
+///     </para>
+///     <para>
+///         续期之外还有八个服务（打开链接、换版本重开、结账能力探测、电台状态……），
+///         统一交给 <see cref="LunarIpcDispatcher" /> 分派，具体动作由注入的
+///         <see cref="ILunarIpcHost" /> 落地。协议细节见 <c>docs/LUNAR.md</c>。
+///     </para>
+///     <para>
+///         这里的做法是：启动前先抢 <see cref="DefaultPort" />。抢到了就自己当服务端；
+///         抢不到说明 Lunar 启动器正开着（它固定占 28190），那就让位，把端口原样交给游戏，
+///         由启动器去处理。
+///     </para>
+/// </summary>
+public sealed class LunarIpcServer : IDisposable
+{
+    /// <summary>Lunar 启动器写死的 IPC 端口。</summary>
+    public const int DefaultPort = 28190;
+
+    /// <summary>RFC 6455 规定的握手魔术串。</summary>
+    private const string WebSocketMagic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
+    /// <summary>单帧上限。协议里的消息都是几百字节，超过这个数一定是别的东西。</summary>
+    private const int MaxFrameBytes = 1 << 20;
+
+    private const int OpcodeText = 0x1;
+    private const int OpcodeBinary = 0x2;
+    private const int OpcodeClose = 0x8;
+    private const int OpcodePing = 0x9;
+    private const int OpcodePong = 0xA;
+
+    private readonly Func<Guid, CancellationToken, Task<LunarRefreshResult>> _refresh;
+    private readonly Action<string> _log;
+    private readonly ILunarIpcHost? _host;
+    private readonly CancellationTokenSource _lifetime = new();
+    private readonly SemaphoreSlim _refreshGate = new(1, 1);
+    private readonly List<LunarIpcConnection> _connections = [];
+    private readonly TcpListener _listener;
+
+    /// <summary>
+    ///     一条已握手的游戏连接。
+    ///     <para>
+    ///         <see cref="WriteGate" /> 是必需的：响应由帧循环写、推送由别的线程写，
+    ///         两个线程同时往一个 <see cref="NetworkStream" /> 写会把帧切碎，
+    ///         游戏侧收到半截消息直接判定协议错误断开。
+    ///     </para>
+    /// </summary>
+    private sealed class LunarIpcConnection(NetworkStream stream, string name, TcpClient client)
+    {
+        public NetworkStream Stream { get; } = stream;
+        public string Name { get; } = name;
+        public TcpClient Client { get; } = client;
+        public SemaphoreSlim WriteGate { get; } = new(1, 1);
+    }
+
+    private LunarIpcServer(TcpListener listener, int port, string installationId,
+        Func<Guid, CancellationToken, Task<LunarRefreshResult>> refresh, Action<string> log,
+        ILunarIpcHost? host)
+    {
+        _listener = listener;
+        _refresh = refresh;
+        _log = log;
+        _host = host;
+        Port = port;
+        InstallationId = installationId;
+    }
+
+    /// <summary>实际监听的端口。</summary>
+    public int Port { get; }
+
+    /// <summary>PCL 这次启动用的 <c>--installationId</c>，用来核对握手里的值。</summary>
+    public string InstallationId { get; }
+
+    /// <summary>当前连着的游戏端数量。</summary>
+    public int ConnectionCount
+    {
+        get
+        {
+            lock (_connections) return _connections.Count;
+        }
+    }
+
+    /// <summary>
+    ///     给所有连着的游戏端推一条通知，返回写成功的连接数。
+    ///     <para>
+    ///         返回 0 不算错误：游戏刚起来的头几秒还没连上来，这时候推什么都会落空。
+    ///         调用方要按「没送到」处理，别以为游戏已经收到了。
+    ///     </para>
+    /// </summary>
+    public async Task<int> SendPushAsync(LunarIpcPush push, CancellationToken token = default)
+    {
+        LunarIpcConnection[] targets;
+        lock (_connections) targets = _connections.ToArray();
+        if (targets.Length == 0) return 0;
+
+        var message = LunarIpcProtocol.EncodePush(push.TypeUrl, push.Payload);
+        var sent = 0;
+
+        foreach (var connection in targets)
+        {
+            try
+            {
+                await WriteFrameAsync(connection, OpcodeBinary, message, token).ConfigureAwait(false);
+                sent++;
+            }
+            catch (Exception ex) when (ex is IOException or SocketException
+                                           or ObjectDisposedException or OperationCanceledException)
+            {
+                Log($"推送 {push.TypeUrl} 到 {connection.Name} 失败：{ex.Message}");
+            }
+        }
+
+        if (sent > 0) Log($"已推送 {push.TypeUrl}（{sent} 个连接）");
+        return sent;
+    }
+
+    /// <summary>
+    ///     抢占 <paramref name="port" /> 并开始监听。
+    ///     <para>
+    ///         端口被占用时不算错误：先探一下对方是不是 WebSocket 服务（Lunar 启动器就是），
+    ///         是的话把端口原样交给游戏，由启动器负责续期；不是的话让游戏别连，
+    ///         免得连到不相干的东西上。
+    ///     </para>
+    ///     <para>
+    ///         <paramref name="fallbackPorts" /> 用于「PCL 能自己续期，不想让位」的场景：
+    ///         主端口被占就依次试这些端口，抢到哪个就把哪个交给游戏。全部失败才回退到
+    ///         上面那套让位逻辑。
+    ///     </para>
+    /// </summary>
+    public static async Task<LunarIpcStartResult> StartAsync(
+        int port,
+        string installationId,
+        Func<Guid, CancellationToken, Task<LunarRefreshResult>> refresh,
+        Action<string> log,
+        IReadOnlyList<int>? fallbackPorts = null,
+        ILunarIpcHost? host = null,
+        CancellationToken cancellationToken = default)
+    {
+        var candidates = new List<int> { port };
+        if (fallbackPorts is not null)
+            foreach (var candidate in fallbackPorts)
+                if (candidate > 0 && !candidates.Contains(candidate))
+                    candidates.Add(candidate);
+
+        foreach (var candidate in candidates)
+        {
+            try
+            {
+                var listener = new TcpListener(IPAddress.Loopback, candidate);
+                listener.Start();
+                var server = new LunarIpcServer(listener, candidate, installationId, refresh, log, host);
+                server.StartAcceptLoop();
+                return new LunarIpcStartResult(server, candidate, LunarIpcPortState.Served,
+                    candidate == port
+                        ? $"已在 127.0.0.1:{candidate} 接管 Lunar IPC"
+                        : $"端口 {port} 被占用，改在 127.0.0.1:{candidate} 接管 Lunar IPC，续期由 PCL 处理");
+            }
+            catch (SocketException ex) when (ex.SocketErrorCode == SocketError.AddressAlreadyInUse)
+            {
+                // 换下一个候选端口
+            }
+            catch (Exception ex) when (ex is SocketException or UnauthorizedAccessException)
+            {
+                return new LunarIpcStartResult(null, 0, LunarIpcPortState.TakenByOther,
+                    $"无法监听端口 {candidate}：{ex.Message}");
+            }
+        }
+
+        var isWebSocket = await LooksLikeWebSocketAsync(port, cancellationToken).ConfigureAwait(false);
+        return isWebSocket
+            ? new LunarIpcStartResult(null, port, LunarIpcPortState.TakenByLauncher,
+                $"端口 {port} 已被占用，且对方是 WebSocket 服务 —— 应该是 Lunar 启动器在运行，" +
+                "续期交给它处理")
+            : new LunarIpcStartResult(null, 0, LunarIpcPortState.TakenByOther,
+                $"端口 {port} 被其他程序占用，且不响应 WebSocket，本次不启用 IPC");
+    }
+
+    private void StartAcceptLoop() => _ = Task.Run(AcceptLoopAsync);
+
+    private async Task AcceptLoopAsync()
+    {
+        var token = _lifetime.Token;
+        while (!token.IsCancellationRequested)
+        {
+            TcpClient client;
+            try
+            {
+                client = await _listener.AcceptTcpClientAsync(token).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
+            {
+                break;
+            }
+            catch (SocketException)
+            {
+                continue;
+            }
+
+            _ = Task.Run(() => HandleConnectionAsync(client, token), CancellationToken.None);
+        }
+    }
+
+    private async Task HandleConnectionAsync(TcpClient client, CancellationToken token)
+    {
+        var name = "未知客户端";
+        LunarIpcConnection? connection = null;
+        try
+        {
+            client.NoDelay = true;
+            using var stream = client.GetStream();
+
+            var headers = await ReadHttpRequestAsync(stream, token).ConfigureAwait(false);
+            if (headers is null)
+            {
+                Log("连接在握手阶段就断了，忽略");
+                return;
+            }
+
+            if (!headers.TryGetValue("sec-websocket-key", out var key) || string.IsNullOrWhiteSpace(key))
+            {
+                await WriteHttpErrorAsync(stream, "400 Bad Request", "缺少 Sec-WebSocket-Key", token)
+                    .ConfigureAwait(false);
+                return;
+            }
+
+            // 握手里的安装 ID 只做核对：PCL 和 Lunar 启动器读的是同一个
+            // ~/.lunarclient/launcher-cache/installation-id，正常情况下一定相等
+            if (headers.TryGetValue("lc-handshake", out var handshakeBase64) &&
+                TryDecodeBase64(handshakeBase64, out var handshakeBytes) &&
+                LunarIpcProtocol.TryDecodeHandshake(handshakeBytes, out var launchId,
+                    out var processId, out var installationId))
+            {
+                name = $"launch {launchId[..Math.Min(8, launchId.Length)]} / pid {processId}";
+                if (!string.IsNullOrEmpty(installationId) &&
+                    !string.Equals(installationId, InstallationId, StringComparison.OrdinalIgnoreCase))
+                    Log($"握手里的 installationId（{installationId}）与本次启动用的（{InstallationId}）不一致，仍然接受");
+                Log($"游戏端已连接：{name}");
+            }
+            else
+            {
+                Log("游戏端没有带 lc-handshake，仍然接受（不影响 RPC）");
+            }
+
+            await AcceptWebSocketAsync(stream, key, token).ConfigureAwait(false);
+
+            // 握手完成才算「可推送的连接」：之前写推送会把没升级的 HTTP 连接写坏
+            connection = new LunarIpcConnection(stream, name, client);
+            lock (_connections) _connections.Add(connection);
+
+            await FrameLoopAsync(connection, token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // 正常退出
+        }
+        catch (Exception ex) when (ex is IOException or SocketException or ObjectDisposedException)
+        {
+            Log($"连接异常断开（{name}）：{ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            Log($"处理 IPC 连接时出错（{name}）：{ex}");
+        }
+        finally
+        {
+            if (connection is not null)
+            {
+                lock (_connections) _connections.Remove(connection);
+                connection.WriteGate.Dispose();
+            }
+
+            try
+            {
+                client.Close();
+            }
+            catch (Exception ex) when (ex is IOException or ObjectDisposedException)
+            {
+                // 已经关了
+            }
+        }
+    }
+
+    private async Task FrameLoopAsync(LunarIpcConnection connection, CancellationToken token)
+    {
+        var stream = connection.Stream;
+        var fragments = new MemoryStream();
+
+        while (!token.IsCancellationRequested)
+        {
+            var frame = await ReadFrameAsync(stream, token).ConfigureAwait(false);
+            if (frame is null) return;
+
+            switch (frame.Value.Opcode)
+            {
+                case OpcodeClose:
+                    await WriteFrameAsync(connection, OpcodeClose, ReadOnlyMemory<byte>.Empty, token)
+                        .ConfigureAwait(false);
+                    Log($"游戏端断开：{connection.Name}");
+                    return;
+
+                case OpcodePing:
+                    await WriteFrameAsync(connection, OpcodePong, frame.Value.Payload, token)
+                        .ConfigureAwait(false);
+                    continue;
+
+                case OpcodePong:
+                    continue;
+
+                case OpcodeText:
+                case OpcodeBinary:
+                    fragments.SetLength(0);
+                    fragments.Write(frame.Value.Payload);
+                    break;
+
+                default:
+                    // 0x0 续帧
+                    if (frame.Value.Opcode != 0) continue;
+                    fragments.Write(frame.Value.Payload);
+                    break;
+            }
+
+            if (!frame.Value.Fin) continue;
+
+            var payload = fragments.ToArray();
+            if (payload.Length == 0) continue;
+
+            await DispatchAsync(connection, payload, token).ConfigureAwait(false);
+        }
+    }
+
+    private async Task DispatchAsync(LunarIpcConnection connection, byte[] payload, CancellationToken token)
+    {
+        if (!LunarIpcProtocol.TryDecodeRequest(payload, out var request))
+        {
+            Log($"收到无法解析的 IPC 消息（{payload.Length} 字节），忽略");
+            return;
+        }
+
+        var isRefresh = request.Service == LunarIpcProtocol.AuthService &&
+                        request.Method == LunarIpcProtocol.RefreshAccountMethod;
+
+        if (!isRefresh)
+        {
+            // 其余八个服务交给 LunarIpcDispatcher。回空响应也是合法的 —— protobuf 解空内容
+            // 得到全默认实例，游戏侧不会抛异常，只是「什么都没发生」。
+            var output = LunarIpcDispatcher.Dispatch(request, _host, Log);
+            await SendAsync(connection, request.RequestId, output, token).ConfigureAwait(false);
+            return;
+        }
+
+        if (!LunarIpcProtocol.TryDecodeRefreshAccountRequest(request.Input, out var uuid))
+        {
+            Log("RefreshAccount 的入参里没有可用的 UUID");
+            await SendRefreshResultAsync(connection, request.RequestId,
+                LunarRefreshResult.Fail(LunarAccountError.Unspecified, "入参无法解析"), token)
+                .ConfigureAwait(false);
+            return;
+        }
+
+        Log($"游戏请求续期账号 {uuid}");
+
+        if (!await _refreshGate.WaitAsync(0, token).ConfigureAwait(false))
+        {
+            Log("已经有一次续期在进行，回 ALREADY_REFRESHING");
+            await SendRefreshResultAsync(connection, request.RequestId,
+                LunarRefreshResult.Fail(LunarAccountError.AlreadyRefreshing, "已有续期在进行"), token)
+                .ConfigureAwait(false);
+            return;
+        }
+
+        LunarRefreshResult result;
+        try
+        {
+            result = await _refresh(uuid, token).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Log($"续期过程中抛异常：{ex}");
+            result = LunarRefreshResult.Fail(LunarAccountError.Unspecified, ex.Message);
+        }
+        finally
+        {
+            _refreshGate.Release();
+        }
+
+        Log(result.Success
+            ? $"账号 {uuid} 续期成功：{result.Message}"
+            : $"账号 {uuid} 续期失败（{result.Error}）：{result.Message}");
+
+        await SendRefreshResultAsync(connection, request.RequestId, result, token).ConfigureAwait(false);
+    }
+
+    private static Task SendRefreshResultAsync(LunarIpcConnection connection, byte[] requestId,
+        LunarRefreshResult result, CancellationToken token)
+    {
+        var output = LunarIpcProtocol.EncodeRefreshAccountResponse(result.Success, result.Error);
+        return SendAsync(connection, requestId, output, token);
+    }
+
+    private static Task SendAsync(LunarIpcConnection connection, byte[] requestId, byte[] output,
+        CancellationToken token)
+    {
+        var message = LunarIpcProtocol.EncodeRpcResponse(requestId, output);
+        return WriteFrameAsync(connection, OpcodeBinary, message, token);
+    }
+
+    #region WebSocket 握手与帧
+
+    /// <summary>读完 HTTP 请求头（到 <c>\r\n\r\n</c> 为止），返回小写键的字典。</summary>
+    private static async Task<Dictionary<string, string>?> ReadHttpRequestAsync(
+        NetworkStream stream, CancellationToken token)
+    {
+        var buffer = new MemoryStream();
+        var single = new byte[1];
+
+        while (buffer.Length < 16 * 1024)
+        {
+            var read = await stream.ReadAsync(single, token).ConfigureAwait(false);
+            if (read == 0) return null;
+
+            buffer.WriteByte(single[0]);
+            if (buffer.Length < 4) continue;
+
+            var tail = buffer.GetBuffer();
+            var offset = (int)buffer.Length - 4;
+            if (tail[offset] == '\r' && tail[offset + 1] == '\n' &&
+                tail[offset + 2] == '\r' && tail[offset + 3] == '\n')
+                break;
+        }
+
+        var text = Encoding.UTF8.GetString(buffer.GetBuffer(), 0, (int)buffer.Length);
+        var lines = text.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+        if (lines.Length == 0) return null;
+
+        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 1; i < lines.Length; i++)
+        {
+            var separator = lines[i].IndexOf(':');
+            if (separator <= 0) continue;
+            headers[lines[i][..separator].Trim()] = lines[i][(separator + 1)..].Trim();
+        }
+
+        return headers;
+    }
+
+    private static Task WriteHttpErrorAsync(NetworkStream stream, string status, string reason,
+        CancellationToken token)
+    {
+        var body = Encoding.UTF8.GetBytes(reason);
+        var head = $"HTTP/1.1 {status}\r\nContent-Type: text/plain; charset=utf-8\r\n" +
+                   $"Content-Length: {body.Length}\r\nConnection: close\r\n\r\n";
+        var headBytes = Encoding.ASCII.GetBytes(head);
+        var all = new byte[headBytes.Length + body.Length];
+        headBytes.CopyTo(all, 0);
+        body.CopyTo(all, headBytes.Length);
+        return stream.WriteAsync(all, token).AsTask();
+    }
+
+    private static async Task AcceptWebSocketAsync(NetworkStream stream, string key,
+        CancellationToken token)
+    {
+        var accept = Convert.ToBase64String(
+            SHA1.HashData(Encoding.ASCII.GetBytes(key + WebSocketMagic)));
+
+        var response = "HTTP/1.1 101 Switching Protocols\r\n" +
+                       "Upgrade: websocket\r\n" +
+                       "Connection: Upgrade\r\n" +
+                       $"Sec-WebSocket-Accept: {accept}\r\n\r\n";
+
+        await stream.WriteAsync(Encoding.ASCII.GetBytes(response), token).ConfigureAwait(false);
+        await stream.FlushAsync(token).ConfigureAwait(false);
+    }
+
+    private readonly record struct WebSocketFrame(bool Fin, int Opcode, byte[] Payload);
+
+    private static async Task<WebSocketFrame?> ReadFrameAsync(NetworkStream stream,
+        CancellationToken token)
+    {
+        var header = new byte[2];
+        if (!await ReadExactlyAsync(stream, header, token).ConfigureAwait(false)) return null;
+
+        var fin = (header[0] & 0x80) != 0;
+        var opcode = header[0] & 0x0F;
+        var masked = (header[1] & 0x80) != 0;
+        long length = header[1] & 0x7F;
+
+        if (length == 126)
+        {
+            var extended = new byte[2];
+            if (!await ReadExactlyAsync(stream, extended, token).ConfigureAwait(false)) return null;
+            length = BinaryPrimitives.ReadUInt16BigEndian(extended);
+        }
+        else if (length == 127)
+        {
+            var extended = new byte[8];
+            if (!await ReadExactlyAsync(stream, extended, token).ConfigureAwait(false)) return null;
+            length = (long)BinaryPrimitives.ReadUInt64BigEndian(extended);
+        }
+
+        if (length < 0 || length > MaxFrameBytes)
+            throw new InvalidDataException($"WebSocket 帧长度异常：{length}");
+
+        var mask = Array.Empty<byte>();
+        if (masked)
+        {
+            mask = new byte[4];
+            if (!await ReadExactlyAsync(stream, mask, token).ConfigureAwait(false)) return null;
+        }
+
+        var payload = new byte[length];
+        if (length > 0 && !await ReadExactlyAsync(stream, payload, token).ConfigureAwait(false)) return null;
+
+        if (masked)
+            for (var i = 0; i < payload.Length; i++)
+                payload[i] ^= mask[i % 4];
+
+        return new WebSocketFrame(fin, opcode, payload);
+    }
+
+    private static async Task WriteFrameAsync(NetworkStream stream, int opcode,
+        ReadOnlyMemory<byte> payload, CancellationToken token)
+    {
+        var header = new List<byte>(10) { (byte)(0x80 | opcode) };
+
+        switch (payload.Length)
+        {
+            case <= 125:
+                header.Add((byte)payload.Length);
+                break;
+            case <= ushort.MaxValue:
+                header.Add(126);
+                header.Add((byte)(payload.Length >> 8));
+                header.Add((byte)payload.Length);
+                break;
+            default:
+                header.Add(127);
+                for (var i = 7; i >= 0; i--) header.Add((byte)((long)payload.Length >> (8 * i)));
+                break;
+        }
+
+        await stream.WriteAsync(header.ToArray(), token).ConfigureAwait(false);
+        if (payload.Length > 0) await stream.WriteAsync(payload, token).ConfigureAwait(false);
+        await stream.FlushAsync(token).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     带写锁的版本。响应和推送来自不同线程，必须串行化，
+    ///     否则两帧的字节会交错，游戏侧解出来的就是垃圾。
+    /// </summary>
+    private static async Task WriteFrameAsync(LunarIpcConnection connection, int opcode,
+        ReadOnlyMemory<byte> payload, CancellationToken token)
+    {
+        await connection.WriteGate.WaitAsync(token).ConfigureAwait(false);
+        try
+        {
+            await WriteFrameAsync(connection.Stream, opcode, payload, token).ConfigureAwait(false);
+        }
+        finally
+        {
+            try
+            {
+                connection.WriteGate.Release();
+            }
+            catch (ObjectDisposedException)
+            {
+                // 服务端正在关，连接对象已经释放过了
+            }
+        }
+    }
+
+    private static async Task<bool> ReadExactlyAsync(NetworkStream stream, byte[] buffer,
+        CancellationToken token)
+    {
+        var offset = 0;
+        while (offset < buffer.Length)
+        {
+            var read = await stream.ReadAsync(buffer.AsMemory(offset), token).ConfigureAwait(false);
+            if (read == 0) return false;
+            offset += read;
+        }
+
+        return true;
+    }
+
+    #endregion
+
+    /// <summary>
+    ///     端口被占时判断对方是不是 WebSocket 服务。Lunar 启动器的 IPC 服务就是，
+    ///     探测完立刻断开，它那边只会记一条「连接已关闭」。
+    /// </summary>
+    private static async Task<bool> LooksLikeWebSocketAsync(int port, CancellationToken token)
+    {
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+            timeout.CancelAfter(TimeSpan.FromSeconds(1));
+
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port, timeout.Token).ConfigureAwait(false);
+
+            var key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(16));
+            var request = $"GET / HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n" +
+                          "Upgrade: websocket\r\nConnection: Upgrade\r\n" +
+                          $"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n";
+
+            var stream = client.GetStream();
+            await stream.WriteAsync(Encoding.ASCII.GetBytes(request), timeout.Token).ConfigureAwait(false);
+
+            var buffer = new byte[16];
+            var read = await stream.ReadAsync(buffer, timeout.Token).ConfigureAwait(false);
+            return read >= 12 &&
+                   Encoding.ASCII.GetString(buffer, 0, read).Contains("101", StringComparison.Ordinal);
+        }
+        catch (Exception ex) when (ex is SocketException or OperationCanceledException or IOException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryDecodeBase64(string value, out byte[] bytes)
+    {
+        try
+        {
+            bytes = Convert.FromBase64String(value.Trim());
+            return bytes.Length > 0;
+        }
+        catch (FormatException)
+        {
+            bytes = [];
+            return false;
+        }
+    }
+
+    private void Log(string message) => _log("[Lunar IPC] " + message);
+
+    public void Dispose()
+    {
+        try
+        {
+            _lifetime.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // 已经释放过
+        }
+
+        try
+        {
+            _listener.Stop();
+        }
+        catch (SocketException)
+        {
+            // 已经停了
+        }
+
+        lock (_connections)
+        {
+            foreach (var connection in _connections)
+            {
+                try
+                {
+                    connection.Client.Close();
+                }
+                catch (Exception ex) when (ex is IOException or ObjectDisposedException)
+                {
+                    // 忽略
+                }
+
+                connection.WriteGate.Dispose();
+            }
+
+            _connections.Clear();
+        }
+
+        _refreshGate.Dispose();
+        _lifetime.Dispose();
+    }
+}
+
+/// <summary>IPC 端口的最终状态。</summary>
+public enum LunarIpcPortState
+{
+    /// <summary>端口空闲，PCL 自己接管了 IPC。</summary>
+    Served,
+
+    /// <summary>端口被一个 WebSocket 服务占着，几乎一定是 Lunar 启动器。</summary>
+    TakenByLauncher,
+
+    /// <summary>端口被占，但对方不像 WebSocket 服务。</summary>
+    TakenByOther
+}
+
+/// <summary>启动 IPC 服务的结果。</summary>
+/// <param name="Server">接管成功时的服务实例，否则为 <c>null</c>。</param>
+/// <param name="GamePort">要传给游戏 <c>--ipcPort</c> 的端口，0 表示不启用。</param>
+/// <param name="State">端口状态。</param>
+/// <param name="Message">给日志看的说明。</param>
+public sealed record LunarIpcStartResult(
+    LunarIpcServer? Server,
+    int GamePort,
+    LunarIpcPortState State,
+    string Message);
