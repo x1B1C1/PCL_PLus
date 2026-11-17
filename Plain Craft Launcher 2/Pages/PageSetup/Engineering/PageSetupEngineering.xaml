@@ -1,0 +1,93 @@
+<local:MyPageRight x:Class="PCL.Pages.PageSetup.PageSetupEngineering"
+                   xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                   xmlns:local="clr-namespace:PCL.Controls"
+                   PanScroll="{Binding ElementName=PanBack}">
+    <local:MyScrollViewer x:Name="PanBack" VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+        <StackPanel x:Name="PanMain" Margin="25,10">
+
+            <local:MyCard Margin="0,15,0,15" Title="工程调试 · Beta A">
+                <StackPanel Margin="25,40,25,18">
+                    <TextBlock TextWrapping="Wrap" LineHeight="20"
+                               Text="本页只在 Beta A 工程测试版里存在，正式构建不包含这段代码。用来对比不同玻璃层数下的观感与 GPU 占用。" />
+                </StackPanel>
+            </local:MyCard>
+
+            <local:MyCard Margin="0,0,0,15" Title="主窗口玻璃">
+                <StackPanel Margin="25,40,25,20">
+                    <local:MyCheckBox x:Name="CheckGlass" Text="启用液态玻璃（整窗材质）"
+                                      Change="CheckGlass_Change" />
+                    <TextBlock Margin="0,10,0,0" TextWrapping="Wrap" Opacity="0.7" FontSize="12"
+                               Text="关闭后回到不透明主题。开启时顶栏、侧栏各有一层玻璃，账号卡与窗口按钮走静态半透明，不额外采样。" />
+                </StackPanel>
+            </local:MyCard>
+
+            <local:MyCard Margin="0,0,0,15" Title="卡片分层">
+                <StackPanel Margin="25,40,25,20">
+                    <TextBlock TextWrapping="Wrap" LineHeight="20" Opacity="0.8"
+                               Text="L1 只有主窗口一层；L2 卡片用半透明色（推荐形态，无额外模糊）；L3 每张卡片再叠一层模糊，用来复现多层玻璃的掉帧。" />
+                    <WrapPanel Margin="0,14,0,0">
+                        <local:MyButton x:Name="BtnL1" Text="L1 基线" Margin="0,0,10,0" Tag="0"
+                                        Click="BtnLayer_Click" />
+                        <local:MyButton x:Name="BtnL2" Text="L2 半透明" Margin="0,0,10,0" Tag="1"
+                                        Click="BtnLayer_Click" />
+                        <local:MyButton x:Name="BtnL3" Text="L3 叠加模糊" Tag="2" Click="BtnLayer_Click" />
+                    </WrapPanel>
+                </StackPanel>
+            </local:MyCard>
+
+            <local:MyCard Margin="0,0,0,15" Title="参数调试">
+                <StackPanel Margin="25,40,25,20">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" Text="透明度" />
+                        <local:MySlider Grid.Column="1" Grid.ColumnSpan="2" x:Name="SliderOpacity"
+                                        MaxValue="100" Change="Slider_Change" />
+                    </Grid>
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" Text="磨砂半径" />
+                        <local:MySlider Grid.Column="1" Grid.ColumnSpan="2" x:Name="SliderFrost"
+                                        MaxValue="24" Change="Slider_Change" />
+                    </Grid>
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" Text="折射强度" />
+                        <local:MySlider Grid.Column="1" Grid.ColumnSpan="2" x:Name="SliderRefraction"
+                                        MaxValue="15" Change="Slider_Change" />
+                    </Grid>
+                    <local:MyButton x:Name="BtnReset" Text="恢复默认" Margin="0,16,0,0"
+                                    Click="BtnReset_Click" />
+                </StackPanel>
+            </local:MyCard>
+
+            <local:MyCard Margin="0,0,0,15" Title="性能">
+                <StackPanel Margin="25,40,25,20">
+                    <TextBlock x:Name="LabGpu" FontSize="26" FontWeight="Bold" Text="--" />
+                    <TextBlock Text="GPU 占用（本进程 3D 引擎）" Opacity="0.6" FontSize="12"
+                               Margin="0,2,0,0" />
+                    <TextBlock x:Name="LabFrame" Margin="0,14,0,0" FontSize="14" Text="帧时间 --" />
+                    <TextBlock x:Name="LabSurfaces" Margin="0,6,0,0" FontSize="14" Text="玻璃面 0" />
+                    <TextBlock x:Name="LabHint" Margin="0,10,0,0" FontSize="12" Opacity="0.6"
+                               TextWrapping="Wrap" Text="" />
+                    <local:MyButton x:Name="BtnRunCompare" Text="跑一轮 L1 → L2 → L3" Margin="0,16,0,0"
+                                    Click="BtnRunCompare_Click" />
+                </StackPanel>
+            </local:MyCard>
+
+        </StackPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>
