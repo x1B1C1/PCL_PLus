@@ -1,0 +1,200 @@
+﻿<local:MyPageRight
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:PCL.Controls"
+    xmlns:val="https://ce.pclc.cc/core/utils/validate"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d" x:Class="PCL.Pages.PageSetup.PageSetupLunar"
+    PanScroll="{Binding ElementName=PanBack, Mode=OneWay}">
+    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+        <StackPanel x:Name="PanMain" Margin="25,10">
+
+            <!-- ① Java 运行环境 -->
+            <local:MyCard Margin="0,15" Title="{DynamicResource Lunar.Setup.Java}">
+                <Grid Margin="25,40,25,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="Name" />
+                        <ColumnDefinition Width="1*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="28" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" VerticalAlignment="Center" HorizontalAlignment="Left"
+                               Text="java.exe" Margin="0,0,25,0" />
+                    <local:MyTextBox x:Name="TextJavaPath" Grid.Row="0" Grid.Column="1"
+                                     HintText="{DynamicResource Lunar.Setup.JavaHint}"
+                                     ValidatedTextChanged="TextJavaPath_OnChanged"
+                                     ToolTip="{DynamicResource Lunar.Setup.JavaDesc}"
+                                     Margin="0,0,10,0" />
+                    <local:MyIconTextButton x:Name="BtnBrowseJava" Grid.Row="0" Grid.Column="2"
+                                            Text="{DynamicResource Lunar.Action.Browse}" LogoScale="0.9" SvgIcon="lucide/folder-open"
+                                            Click="BtnBrowseJava_Click" />
+
+                    <local:MyHint x:Name="HintJava" Grid.Row="1" Grid.ColumnSpan="3" Margin="0,9,0,0"
+                                  Theme="Yellow" Visibility="Collapsed" Text="" />
+                </Grid>
+            </local:MyCard>
+
+            <!-- ② 全局内存与 JVM 参数 -->
+            <local:MyCard Margin="0,15" Title="{DynamicResource Lunar.Setup.MemoryTitle}">
+                <Grid Margin="25,40,25,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="Name" />
+                        <ColumnDefinition Width="1*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="28" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" VerticalAlignment="Center" HorizontalAlignment="Left"
+                               Text="{DynamicResource Lunar.Setup.MaxMemory}" Margin="0,0,25,0" />
+                    <local:MyTextBox x:Name="TextMemory" Grid.Row="0" Grid.Column="1" Margin="0,0,10,0"
+                                     HintText="{DynamicResource Lunar.Setup.MaxMemoryHint}"
+                                     ValidatedTextChanged="TextMemory_OnChanged"
+                                     ToolTip="{DynamicResource Lunar.Setup.MaxMemoryDesc}">
+                        <local:MyTextBox.ValidateRules>
+                            <val:IntValidator Min="512" Max="131072" />
+                        </local:MyTextBox.ValidateRules>
+                    </local:MyTextBox>
+                    <!--
+                        MyIconButton.Click 的第二个参数是 EventArgs（不是 RoutedEventArgs）。
+                        写错了编译期查不出来，打开设置页才抛 XamlParseException。
+                    -->
+                    <local:MyIconButton x:Name="BtnLoadLunarMemory" Grid.Row="0" Grid.Column="2"
+                                        Height="23" VerticalAlignment="Center"
+                                        Click="BtnLoadLunarMemory_Click"
+                                        ToolTip="{DynamicResource Lunar.Setup.LoadNative}"
+                                        ToolTipService.Placement="Right"
+                                        ToolTipService.InitialShowDelay="200" ToolTipService.VerticalOffset="-1"
+                                        SvgIcon="lucide/rotate-ccw" LogoScale="0.9" />
+
+                    <!-- 这个数字是从哪儿来的，直接写在下面，省得用户猜「我 Lunar 里设的 8G 去哪了」 -->
+                    <local:MyHint x:Name="HintMemory" Grid.Row="1" Grid.ColumnSpan="3" Margin="0,9,0,0"
+                                  Theme="Blue" Text="" />
+
+                    <!--
+                        这一行必须 Auto：里面有个 23px 高的图标按钮，塞进定高行会被裁掉，
+                        按钮还会溢出到上下两行去（窄窗口下表现为「附加 JVM 参数」被压扁、
+                        和上面的提示条叠在一起）。
+                    -->
+                    <StackPanel Grid.Row="2" Grid.ColumnSpan="3" Orientation="Horizontal"
+                                HorizontalAlignment="Left" Margin="0,12,0,6">
+                        <TextBlock Text="{DynamicResource Lunar.Setup.Jvm}" VerticalAlignment="Center" />
+                        <local:MyIconButton Height="23" Margin="6,1,0,0" VerticalAlignment="Center"
+                                            x:Name="BtnResetJvm" Click="BtnResetJvm_Click"
+                                            ToolTip="{DynamicResource Lunar.Action.Clear}" ToolTipService.Placement="Right"
+                                            ToolTipService.InitialShowDelay="200" ToolTipService.VerticalOffset="-1"
+                                            SvgIcon="lucide/rotate-ccw" LogoScale="0.9" />
+                    </StackPanel>
+                    <local:MyTextBox x:Name="TextJvm" Grid.Row="3" Grid.ColumnSpan="3"
+                                     Height="100" AcceptsReturn="True" TextWrapping="Wrap"
+                                     VerticalContentAlignment="Top" Padding="0,5"
+                                     VerticalScrollBarVisibility="Auto" MaxLength="4000"
+                                     HintText="{DynamicResource Lunar.Setup.JvmHint}"
+                                     ValidatedTextChanged="TextJvm_OnChanged"
+                                     ToolTip="{DynamicResource Lunar.Setup.JvmDesc}" />
+                </Grid>
+            </local:MyCard>
+
+            <!-- ③ 启动版本 + 按版本覆盖 -->
+            <local:MyCard Margin="0,15" Title="{DynamicResource Lunar.Setup.OverrideTitle}">
+                <Grid Margin="25,40,25,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="Name" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="28" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" VerticalAlignment="Center" HorizontalAlignment="Left"
+                               Text="{DynamicResource Lunar.Setup.OverrideVersion}" Margin="0,0,25,0" />
+                    <local:MyComboBox x:Name="ComboVersion" Grid.Row="0" Grid.Column="1"
+                                      SelectionChanged="ComboVersion_OnSelectionChanged" />
+
+                    <!--
+                        选版本的地方只该有一个：这个下拉框既决定「Lunar 板块启动哪个版本」，
+                        也决定下面这块覆盖设置编辑的是谁。以前它只管覆盖，启动版本得跑到
+                        Lunar 板块再选一次，两边不同步时就会出现「设置里选了 A、启动的是 B」。
+                    -->
+                    <local:MyHint x:Name="HintVersion" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,9,0,0"
+                                  Theme="Blue" Text="{DynamicResource Lunar.Setup.VersionHint}" />
+
+                    <local:MyCheckBox x:Name="CheckVersionOverride" Grid.Row="2" Grid.ColumnSpan="2"
+                                      Margin="0,9,0,0"
+                                      Text="{DynamicResource Lunar.Setup.OverrideCheck}"
+                                      Change="CheckVersionOverride_OnChange" />
+
+                    <StackPanel Grid.Row="3" Grid.ColumnSpan="2" x:Name="PanVersionOptions" Margin="0,12,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="Name" />
+                                <ColumnDefinition Width="1*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="28" />
+                                <RowDefinition Height="9" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                       Margin="0,0,25,0" Text="{DynamicResource Lunar.Setup.MaxMemory}" />
+
+                            <!--
+                                底色由外层 Border 画，输入框自己设成透明（HasBackground=False）。
+                                原因：MyTextBox 在悬停/聚焦时会把底色换成 ColorBrush7，暖色主题下
+                                那是一条发黑的色块 —— 深色主题里尤其像出了 bug。包一层固定底色的
+                                Border 之后，无论它被判定成什么状态，看到的都是这一层。
+                            -->
+                            <Border Grid.Row="0" Grid.Column="1" CornerRadius="3" BorderThickness="1"
+                                    Background="{DynamicResource ColorBrushHalfWhite}"
+                                    BorderBrush="{DynamicResource ColorBrushBg0}">
+                                <local:MyTextBox x:Name="TextVersionMemory" HasBackground="False"
+                                                 BorderThickness="0"
+                                                 HintText="{DynamicResource Lunar.Setup.OverrideHint}"
+                                                 ValidatedTextChanged="TextVersionMemory_OnChanged"
+                                                 ToolTip="{DynamicResource Lunar.Setup.OverrideDesc}">
+                                    <local:MyTextBox.ValidateRules>
+                                        <val:IntValidator Min="512" Max="131072" />
+                                    </local:MyTextBox.ValidateRules>
+                                </local:MyTextBox>
+                            </Border>
+
+                            <TextBlock Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                       Margin="0,12,25,6" Text="{DynamicResource Lunar.Setup.Jvm}" />
+
+                            <Border Grid.Row="2" Grid.Column="1" CornerRadius="3" BorderThickness="1"
+                                    Margin="0,12,0,0"
+                                    Background="{DynamicResource ColorBrushHalfWhite}"
+                                    BorderBrush="{DynamicResource ColorBrushBg0}">
+                                <local:MyTextBox x:Name="TextVersionJvm" HasBackground="False"
+                                                 BorderThickness="0"
+                                                 Height="80" AcceptsReturn="True" TextWrapping="Wrap"
+                                                 VerticalContentAlignment="Top" Padding="0,5"
+                                                 VerticalScrollBarVisibility="Auto" MaxLength="4000"
+                                                 HintText="{DynamicResource Lunar.Setup.OverrideHint}"
+                                                 ValidatedTextChanged="TextVersionJvm_OnChanged" />
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+
+                    <local:MyHint x:Name="HintEffective" Grid.Row="4" Grid.ColumnSpan="2" Margin="0,14,0,0"
+                                  Theme="Blue" Text="" />
+                </Grid>
+            </local:MyCard>
+
+        </StackPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>
