@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>14.0</LangVersion>
+    <AssemblyName>PCL.Plugin.ImcProxy</AssemblyName>
+    <RootNamespace>PCL.Plugin.ImcProxy</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PCL.Core\PCL.Core.csproj">
+      <Private>false</Private>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="plugin.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

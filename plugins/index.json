@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "plugins": [
+    {
+      "id": "imcproxy.control",
+      "name": "IMCProxy",
+      "version": "2.0.0",
+      "author": "hert1145",
+      "description": "在启动器内下载、启动并配置 IMCProxy 本地代理，附带一个独立的控制页。",
+      "packageUrl": "https://raw.githubusercontent.com/x1B1C1/PCL_Plus/main/plugins/IMCProxy-2.0.0.pclplugin",
+      "website": "https://github.com/askbbtsk/pcl-lite/pull/22",
+      "sha256": "c3fc943c606a69ce97c3e5a3827e0ea36339d93edc3e7a0adebd0c19862d2054",
+      "localizedNames": {
+        "zh-CN": "IMCProxy 代理",
+        "zh-TW": "IMCProxy 代理"
+      },
+      "localizedDescriptions": {
+        "zh-CN": "在启动器内下载、启动并配置 IMCProxy 本地代理。"
+      }
+    }
+  ]
+}
