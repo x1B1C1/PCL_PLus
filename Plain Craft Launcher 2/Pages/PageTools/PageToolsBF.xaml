@@ -1,0 +1,31 @@
+<local:MyPageRight x:Class="PCL.Pages.PageTools.PageToolsBF"
+                   xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                   xmlns:local="clr-namespace:PCL.Controls"
+                   PanScroll="{Binding ElementName=PanBack}">
+    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+        <StackPanel x:Name="PanMain" Margin="25,10">
+            <!-- 【调试专属模块】4 个调试设置项放在 BF 控制台页顶部，打开「工具」即可看到 -->
+            <local:MyCard Margin="0,15,0,15" Title="调试设置">
+                <StackPanel Margin="25,40,25,20">
+                    <local:MyCheckBox x:Name="CheckDebugPanel"
+                                      Text="1. 启用右侧调试日志面板（默认开启，宽度为主窗口的 40%）" />
+                    <local:MyCheckBox x:Name="CheckDebugReserved2" Margin="0,10,0,0"
+                                      Text="2. 预留调试项（待接入）" IsEnabled="False" />
+                    <local:MyCheckBox x:Name="CheckDebugReserved3" Margin="0,10,0,0"
+                                      Text="3. 预留调试项（待接入）" IsEnabled="False" />
+                    <local:MyCheckBox x:Name="CheckDebugReserved4" Margin="0,10,0,0"
+                                      Text="4. 预留调试项（待接入）" IsEnabled="False" />
+                </StackPanel>
+            </local:MyCard>
+            <local:MyCard Margin="0,0,0,15" Title="BF 工程控制台">
+                <local:BfConsole Margin="25,40,25,20" />
+            </local:MyCard>
+            <local:MyCard Margin="0,0,0,15" Title="构建信息">
+                <StackPanel Margin="25,40,25,20">
+                    <TextBlock x:Name="LabBuildInfo" TextWrapping="Wrap" FontSize="12.5" />
+                </StackPanel>
+            </local:MyCard>
+        </StackPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>
